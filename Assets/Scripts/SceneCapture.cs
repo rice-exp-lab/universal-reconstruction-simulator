@@ -102,7 +102,7 @@ public class RigCaptureSequence : MonoBehaviour
             frames = new List<FrameMetadata>()
         };
 
-        // Static camera info
+        // camera info
         foreach (var cam in cams)
         {
             meta.cameras.Add(new CameraStaticInfo
@@ -173,7 +173,7 @@ public class RigCaptureSequence : MonoBehaviour
         Time.captureFramerate = 0;
         isCapturing = false;
 
-        Debug.Log($"Capture complete. Saved to:\n{runDir}");
+        Debug.Log($"Capture complete. Saved to:\n{runDir} for \n{cams.Length} cameras");
     }
 
     // ---------------- Structure to save metadata ----------------
