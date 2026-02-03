@@ -1,8 +1,11 @@
 using UnityEngine;
+using UnityEngine.Experimental.GlobalIllumination;
 
 public class Lights : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    public Transform interiorLight;
+    public bool enable;
+
     void Start()
     {
         
