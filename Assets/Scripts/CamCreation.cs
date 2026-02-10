@@ -6,6 +6,7 @@ public class CamCreation : MonoBehaviour
     public Transform target;
     [Tooltip("Prefab for cameras")]
     public GameObject cameraPrefab;
+    public GameObject localVol;
 
     [Header("Rig")]
     [Tooltip("Total number of cameras for rig")]
@@ -55,6 +56,7 @@ public class CamCreation : MonoBehaviour
             camGO.transform.LookAt(target.position);
             Camera cam = camGO.GetComponent<Camera>();
             cam.targetDisplay = i;
+            //GameObject volume = Instantiate(localVol, camGO.transform);
         }
         
     }
