@@ -6,5 +6,13 @@ nav_order: 1
 ---
 
 # Installation
-To install the simulator, run:
-`pip install -r requirements.txt`
+
+### Unity Requirements
+Since this is a Unity-based simulator, ensure you have:
+* **Unity Version:** 2022.3 LTS (or higher)
+* **Packages:** Universal Render Pipeline (URP)
+
+### Steps
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/rice-exp-lab/universal-reconstruction-simulator.git](https://github.com/rice-exp-lab/universal-reconstruction-simulator.git)

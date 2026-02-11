@@ -4,14 +4,18 @@ remote_theme: just-the-docs/just-the-docs
 
 # Navigation Settings
 nav_config:
-  # This enables the sidebar navigation
   sort_order: alphabetical 
 
 # Deployment Settings
 url: "https://rice-exp-lab.github.io"
 baseurl: "/universal-reconstruction-simulator"
+# This tells Jekyll to only look inside your docs folder for content
+source: docs 
 
-# Tell the theme to use your custom stylesheet
+# Branding
+logo: "/assets/images/logo.png"
+
+# Style Settings
 scss:
   theme_color: "#00205B"
 
