@@ -7,11 +7,7 @@ url: "https://rice-exp-lab.github.io"
 baseurl: "/universal-reconstruction-simulator"
 
 # Branding
-logo: "/assets/images/rice.svg"
-
-# Style Settings
-scss:
-  theme_color: "#00205B"
+logo: "/assets/images/logo.png"
 
 # Navigation
 nav_config:

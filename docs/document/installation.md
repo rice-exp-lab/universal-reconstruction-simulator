@@ -1,14 +1,15 @@
 ---
 layout: default
 title: Installation
-parent: Getting Started
-nav_order: 1
+nav_order: 3
 ---
 
 # Installation
 
-### Unity Requirements
-Since this is a Unity-based simulator, ensure you have:
-* **Unity Version:** 2022.3 LTS (or higher)
-* **Packages:** Universal Render Pipeline (URP)
+### Requirements
+* Unity 2022.3 LTS
+* Python 3.9+
 
+### Setup
+Run the following command in your terminal:
+`pip install -r requirements.txt`
