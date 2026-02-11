@@ -16,9 +16,6 @@ source: docs
 # logo: "/assets/images/logo.png"
 
 # Style Settings
-scss:
-  theme_color: "#00205B"
-
 # Theme Customization
 aux_links:
   "GitHub Repository":
