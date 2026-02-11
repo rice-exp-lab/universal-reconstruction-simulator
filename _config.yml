@@ -11,6 +11,10 @@ nav_config:
 url: "https://rice-exp-lab.github.io"
 baseurl: "/universal-reconstruction-simulator"
 
+# Tell the theme to use your custom stylesheet
+scss:
+  theme_color: "#00205B"
+
 # Theme Customization
 aux_links:
   "GitHub Repository":
