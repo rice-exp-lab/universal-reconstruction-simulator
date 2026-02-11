@@ -2,21 +2,21 @@ title: URS
 description: A comprehensive tool for reconstruction simulation.
 remote_theme: just-the-docs/just-the-docs
 
-# Navigation Settings
-nav_config:
-  sort_order: alphabetical 
-
 # Deployment Settings
 url: "https://rice-exp-lab.github.io"
 baseurl: "/universal-reconstruction-simulator"
-# This tells Jekyll to only look inside your docs folder for content
-source: docs 
 
 # Branding
-# logo: "/assets/images/logo.png"
+logo: "/assets/images/rice.svg"
 
 # Style Settings
-# Theme Customization
+scss:
+  theme_color: "#00205B"
+
+# Navigation
+nav_config:
+  sort_order: alphabetical
+
 aux_links:
   "GitHub Repository":
     - https://github.com/rice-exp-lab/universal-reconstruction-simulator
