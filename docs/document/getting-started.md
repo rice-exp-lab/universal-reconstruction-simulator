@@ -10,4 +10,4 @@ has_children: true
 The **Universal Reconstruction Simulator (URS)** is designed to be plug-and-play. This section will guide you through the initial setup and core concepts.
 
 ## Overview
-1. [Get Started]({% link getting-started.md %})
+[Get Started](./getting-started.md)
