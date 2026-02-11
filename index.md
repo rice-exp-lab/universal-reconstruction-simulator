@@ -8,7 +8,7 @@ description: "Overview of the Universal Reconstruction Simulator."
 # Universal Reconstruction Simulator
 {: .fs-9 }
 
-Welcome! This simulator provides a framework for [one-sentence value proposition].
+Welcome! This simulator provides a framework for Reconstructing 4D scenes.
 {: .fs-6 .fw-300 }
 
 [Get Started]({% link docs/getting-started.md %}){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } [View on GitHub](https://github.com/rice-exp-lab/universal-reconstruction-simulator){: .btn .fs-5 .mb-4 .mb-md-0 }
