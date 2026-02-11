@@ -1,18 +1,17 @@
 title: Universal Reconstruction Simulator
-description: A simulator for [briefly describe what it reconstructs].
-remote_theme: pages-themes/minimal
-baseurl: "/universal-reconstruction-simulator" # CRITICAL: Must match your repo name
+description: A comprehensive tool for reconstruction simulation.
+remote_theme: just-the-docs/just-the-docs
+
+# Navigation Settings
+nav_config:
+  # This enables the sidebar navigation
+  sort_order: alphabetical 
+
+# Deployment Settings
 url: "https://rice-exp-lab.github.io"
+baseurl: "/universal-reconstruction-simulator"
 
-# Header links
-google_analytics: # Optional: UA-XXXXXXXXX-X
-show_downloads: true
-
-# Navigation (if the theme supports it)
-nav:
-  - text: Home
-    url: /
-  - text: Documentation
-    url: /docs/
-  - text: GitHub
-    url: https://github.com/rice-exp-lab/universal-reconstruction-simulator
+# Theme Customization
+aux_links:
+  "GitHub Repository":
+    - https://github.com/rice-exp-lab/universal-reconstruction-simulator
