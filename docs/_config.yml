@@ -7,7 +7,7 @@ url: "https://rice-exp-lab.github.io"
 baseurl: "/universal-reconstruction-simulator"
 
 # Branding
-logo: "/assets/images/logo.png"
+logo: "/assets/images/rice.svg"
 
 # Navigation
 nav_config:
