@@ -1,20 +1,15 @@
 ---
 layout: default
 title: Getting Started
-parent: Home
 nav_order: 2
 ---
 
 # Getting Started
 
-To begin using the Universal Reconstruction Simulator:
+Follow these steps to set up the simulator:
 
-<<<<<<< HEAD
-1. Clone the repo.
-2. Open the Unity project.
-3. Run the Python reconstruction scripts.
+1. **Clone the repo** to your local machine.
+2. **Open the Unity project** located in the root directory.
+3. **Run the Python scripts** for data reconstruction.
 
-[View Installation Details]({% link document/installation.md %})
-=======
-## Overview
->>>>>>> 744e22cac375b65844c4456a53c8ce2c9801acf5
+[Proceed to Installation](./installation.md)
