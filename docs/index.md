@@ -17,3 +17,9 @@ Welcome! This simulator provides a framework for Reconstructing 4D scenes.
 
 ## Why use this simulator?
 Briefly explain the reconstruction logic or the specific problem this solves for the Rice Exp Lab.
+<<<<<<< HEAD
+=======
+
+[Get Started]({% link document/getting-started.md %})
+[Installation]({% link document/installation.md %})
+>>>>>>> 9209e24077e382d415b535e0c434740b599a82df
