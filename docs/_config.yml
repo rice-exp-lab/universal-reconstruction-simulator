@@ -13,7 +13,7 @@ baseurl: "/universal-reconstruction-simulator"
 source: docs 
 
 # Branding
-logo: "/assets/images/logo.png"
+# logo: "/assets/images/logo.png"
 
 # Style Settings
 scss:
