@@ -9,7 +9,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class GenerateArucoBoardToRawImage_HDRP : MonoBehaviour
+public class ArUco : MonoBehaviour
 {
     public enum ArUcoDictionary
     {
@@ -44,9 +44,9 @@ public class GenerateArucoBoardToRawImage_HDRP : MonoBehaviour
     [Tooltip("Number of rows")]
     public int markersY = 7;
     [Tooltip("Marker side length")]
-    public float markerLength = 0.04f;
+    public float markerLength = 0.07f;
     [Tooltip("Checker side length")]
-    public float checkerLength = 0.05f;
+    public float checkerLength = 0.1f;
     //[Tooltip("Board side length")]
     //public float boardWidthMeters = 0.20f;
     //public float markerSeparation = 0.01f; // unidad “real” relativa
@@ -76,7 +76,7 @@ public class GenerateArucoBoardToRawImage_HDRP : MonoBehaviour
         Dictionary dict = Objdetect.getPredefinedDictionary((int)dictionaryId);
 
         float squareLength = checkerLength; //boardWidthMeters / markersX;
-        float markerLengthM = Math.Min(markerLength, squareLength * 0.8f); 
+        float markerLengthM = Math.Min(markerLength, squareLength * 0.6f); 
 
         CharucoBoard charucoBoard = new CharucoBoard(new Size(markersX, markersY),
             squareLength, markerLengthM,
@@ -88,7 +88,7 @@ public class GenerateArucoBoardToRawImage_HDRP : MonoBehaviour
         int outH = markersY * pixelsPerMarker;
 
         Mat gray = new Mat(outH, outW, CvType.CV_8UC1);
-        charucoBoard.generateImage(new Size(outW, outH), gray, marginPixels, 1);
+        charucoBoard.generateImage(new Size(outW, outH), gray, marginPixels, 2);
 
         Mat rgb = new Mat();
         Imgproc.cvtColor(gray, rgb, Imgproc.COLOR_GRAY2RGB);
@@ -103,11 +103,24 @@ public class GenerateArucoBoardToRawImage_HDRP : MonoBehaviour
 
         float boardWidthMeters = squareLength * markersX;
 
+        // 1. Calculamos el tamaño real de la zona de juego (cuadros)
+        float contentWidthMeters = squareLength * markersX;
+        float contentHeightMeters = squareLength * markersY;
+
+        // 2. Calculamos cuánto mide un píxel en metros basándonos en el contenido
+        // (Sabiendo que contentWidthMeters corresponde a markersX * pixelsPerMarker)
+        float metersPerPixel = contentWidthMeters / (markersX * pixelsPerMarker);
+
+        // 3. Calculamos el tamaño TOTAL de la imagen incluyendo los márgenes
+        float totalWidthMeters = _tex.width * metersPerPixel;
+        float totalHeightMeters = _tex.height * metersPerPixel;
+
         RectTransform rt = targetRawImage.rectTransform;
         float aspect = (float)_tex.height / _tex.width;
-        rt.sizeDelta = new Vector2(boardWidthMeters, boardWidthMeters * aspect);
+        rt.sizeDelta = new Vector2(totalWidthMeters, totalHeightMeters);
 
         gray.Dispose();
         rgb.Dispose();
     }
+
 }
