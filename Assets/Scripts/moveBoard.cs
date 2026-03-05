@@ -3,10 +3,10 @@ using UnityEngine.InputSystem;
 
 public class moveBoard : MonoBehaviour
 {
-    public float maxRotation = 5f;
-    public float minRotation = -5f;
+    public float maxRotation = 1f;
+    public float minRotation = -1f;
     public float maxTranslation = 0.5f;
-    public float minTranlation = -0.5f;
+    //public float minTranlation = -0.5f;
     Vector3 positionOrigin;
 
     void Start()
@@ -21,18 +21,19 @@ public class moveBoard : MonoBehaviour
         if (Keyboard.current.rKey.isPressed)
         {
             float randomRotX =  Random.Range(minRotation, maxRotation);
-            float randomRotY = Random.Range(minRotation, maxRotation);
+            //float randomRotY = Random.Range(minRotation, maxRotation);
             float randomRotZ = Random.Range(minRotation, maxRotation);
 
-            Quaternion randomRotation = Quaternion.Euler(randomRotX, randomRotY, randomRotZ);
+            Quaternion randomRotation = Quaternion.Euler(randomRotX, 0, randomRotZ);
             transform.rotation = randomRotation;
 
             //float randomX = Random.Range(minRotation, maxRotation);
             //float randomY = Random.Range(minRotation, maxRotation);
             //float randomZ = Random.Range(minRotation, maxRotation);
+            //float x = positionOrigin.x;
 
-            //Vector3 randomPosition = new Vector3(randomX, randomY, randomZ);
-            Vector3 randomPosition = positionOrigin + Random.insideUnitSphere * 0.5f;
+            //Vector3 randomPosition = new Vector3(x, randomY, randomZ);
+            Vector3 randomPosition = positionOrigin + Random.insideUnitSphere * maxTranslation;
             transform.position = randomPosition;
         }
     }

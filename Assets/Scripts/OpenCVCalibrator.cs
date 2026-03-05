@@ -62,6 +62,8 @@ public class OpenCVCalibrator : MonoBehaviour
         //Core.flip(rgba, rgba, -1);
         Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY);
 
+        
+        
         // 3. Detectar puntos Charuco
         Mat charucoCorners = new Mat(), charucoIds = new Mat();
         List<Mat> markerCorners = new List<Mat>();

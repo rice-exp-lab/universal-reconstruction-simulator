@@ -50,7 +50,7 @@ public class ArUco : MonoBehaviour
     //[Tooltip("Board side length")]
     //public float boardWidthMeters = 0.20f;
     //public float markerSeparation = 0.01f; // unidad “real” relativa
-    private const int CHARUCO_MARKER_FIRST_MARKER = 0;
+    private const int CHARUCO_MARKER_FIRST_MARKER = 1;
     private const int CHARUCO_BOARD_MARGIN_SIZE = 10;
     private const bool USE_LEGACY_PATTERN = false;
 
@@ -103,15 +103,11 @@ public class ArUco : MonoBehaviour
 
         float boardWidthMeters = squareLength * markersX;
 
-        // 1. Calculamos el tamaño real de la zona de juego (cuadros)
         float contentWidthMeters = squareLength * markersX;
         float contentHeightMeters = squareLength * markersY;
 
-        // 2. Calculamos cuánto mide un píxel en metros basándonos en el contenido
-        // (Sabiendo que contentWidthMeters corresponde a markersX * pixelsPerMarker)
         float metersPerPixel = contentWidthMeters / (markersX * pixelsPerMarker);
 
-        // 3. Calculamos el tamaño TOTAL de la imagen incluyendo los márgenes
         float totalWidthMeters = _tex.width * metersPerPixel;
         float totalHeightMeters = _tex.height * metersPerPixel;
 
