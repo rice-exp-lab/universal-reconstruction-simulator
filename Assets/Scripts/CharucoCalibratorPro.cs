@@ -5,7 +5,6 @@ using OpenCVForUnity.ImgcodecsModule;
 using OpenCVForUnity.ImgprocModule;
 using OpenCVForUnity.ObjdetectModule;
 using OpenCVForUnity.UnityIntegration;
-using OpenCVForUnity.UnityUtils.MOT.ByteTrack;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -18,16 +17,17 @@ public class CharucoCalibratorPro : MonoBehaviour
     [Header("Referencias")]
     public Camera cameraCapture;
     public RawImage display;
+    public Transform refCharuco;
 
     [Header("Mismas medidas que el Generador")]
-    public int squaresX = 2;
-    public int squaresY = 2;
-    public float squareLength = 0.5f;
-    public float markerLength = 0.7f;
+    public int squaresX = 5;
+    public int squaresY = 7;
+    public float squareLength = 0.07f;
+    public float markerLength = 0.1f;
 
-    [Header("Image Resolution")]
-    public int width;
-    public int height;
+    //[Header("Image Resolution")]
+    //public int width;
+    //public int height;
 
     [Header("Save Results")]
     public bool savePng = false;
@@ -114,8 +114,8 @@ public class CharucoCalibratorPro : MonoBehaviour
         Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY);
 
         // PRE-PROCESADO PARA HDRP ?? 
-        Core.normalize(gray, gray, 0, 255, Core.NORM_MINMAX);
-        Imgproc.threshold(gray, gray, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
+        //Core.normalize(gray, gray, 0, 255, Core.NORM_MINMAX);
+        //Imgproc.threshold(gray, gray, 0, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
 
         // Mat to save results
         Mat charucoCorners = new Mat(), charucoIds = new Mat();
@@ -159,12 +159,13 @@ public class CharucoCalibratorPro : MonoBehaviour
         if (kb.cKey.wasPressedThisFrame)
         {
             RunCalibration();
+            
         }
     }
 
     void SaveFrame(Mat corners, Mat ids)
     {
-        if (ids.total() > 0)
+        if (ids.total() >= 6 && corners.rows() > 0 && corners.cols() > 0)
         {
             allCharucoCorners.Add(corners.clone());
             allCharucoIds.Add(ids.clone());
@@ -174,7 +175,8 @@ public class CharucoCalibratorPro : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("No se detectaron suficientes puntos Charuco para guardar.");
+            Debug.LogWarning($"Frame descartado: {ids.total()} ids, " +
+                        $"corners {corners.rows()}x{corners.cols()}");
         }
 
         if (savePng)
@@ -197,7 +199,10 @@ public class CharucoCalibratorPro : MonoBehaviour
             Mat corners = allCharucoCorners[i];
             Mat ids = allCharucoIds[i];
 
-            if (ids.total() > 0)
+            Mat corners32f = new Mat();
+            corners.convertTo(corners32f, CvType.CV_32FC2);
+
+            if (ids.total() > 4)
             {
                 Mat objP = new Mat((int)ids.total(), 1, CvType.CV_32FC3);
 
@@ -229,11 +234,11 @@ public class CharucoCalibratorPro : MonoBehaviour
         );
 
         // get extrinsics
-        int last = allCharucoCorners.Count - 1;
+        int idx = allCharucoCorners.Count - 1;
+        //int idx = 0;
 
-
-        MatOfPoint3f obj = new MatOfPoint3f(allObjectPoints[last]);
-        MatOfPoint2f img = new MatOfPoint2f(allImagePoints[last]);
+        MatOfPoint3f obj = new MatOfPoint3f(allObjectPoints[idx]);
+        MatOfPoint2f img = new MatOfPoint2f(allImagePoints[idx]);
 
         Mat rvec = new Mat();
         Mat tvec = new Mat();
@@ -244,14 +249,74 @@ public class CharucoCalibratorPro : MonoBehaviour
             Mat R = new Mat();
             Calib3d.Rodrigues(rvec, R);
 
-            Debug.Log("Distancia (Z): " + tvec.get(2, 0)[0]);
+            
+            Debug.Log("Matriz R:\n" + R.dump());
+
+            Quaternion boardRotCam = Quaternion.Inverse(cameraCapture.transform.rotation) * refCharuco.rotation;
+            Matrix4x4 rotationMatrixUnity = Matrix4x4.Rotate(boardRotCam);
+
+            Matrix4x4 M = Matrix4x4.identity;
+            M.m11 = -1;
+
+            Matrix4x4 rotMatrixUnityCV = M * rotationMatrixUnity * M;
+            Mat rotMatrixUnityCV3 =new Mat(3,3,CvType.CV_64FC1);
+            rotMatrixUnityCV3.put(0, 0, rotMatrixUnityCV.m00); rotMatrixUnityCV3.put(0, 1, rotMatrixUnityCV.m01); rotMatrixUnityCV3.put(0, 2, rotMatrixUnityCV.m02);
+            rotMatrixUnityCV3.put(1, 0, rotMatrixUnityCV.m10); rotMatrixUnityCV3.put(1, 1, rotMatrixUnityCV.m11); rotMatrixUnityCV3.put(1, 2, rotMatrixUnityCV.m12);
+            rotMatrixUnityCV3.put(2, 0, rotMatrixUnityCV.m20); rotMatrixUnityCV3.put(2, 1, rotMatrixUnityCV.m21); rotMatrixUnityCV3.put(2, 2, rotMatrixUnityCV.m22);
+
+            Debug.Log("Rotation UNITY:X: "+ rotMatrixUnityCV3.dump());// {boardRotCam.x:F3}, Y:{boardRotCam.y:F3}, Z:{boardRotCam.z:F3}");
+
+            Mat R_cv_t = new Mat();
+            Core.transpose(R, R_cv_t);
+            Mat R_err = new Mat();
+            Core.gemm(rotMatrixUnityCV3,R_cv_t,1.0,new Mat(),0.0,R_err);
+
+            double trace = R_err.get(0, 0)[0] + R_err.get(1, 1)[0] + R_err.get(2, 2)[0];
+            double cosTheta = (trace - 1.0) / 2.0;
+
+            // Clamp por errores numéricos
+            cosTheta = Mathf.Clamp((float)cosTheta, -1f, 1f);
+
+            double thetaRad = System.Math.Acos(cosTheta);
+            double thetaDeg = thetaRad * 180.0 / System.Math.PI;
+
+            Debug.Log($"Rotation error: {thetaDeg:F4} degrees");
+
+            // Get the position of the board in camera coord system to compare to tvec
+            // y axis in OpenCV is negative
+            Vector3 boardPosCam = cameraCapture.transform.InverseTransformPoint(refCharuco.transform.position);
+            
+            Vector3 boardPosCamCV = new Vector3(
+                boardPosCam.x,
+                -boardPosCam.y,
+                boardPosCam.z);
+            
+            Debug.Log("Matriz t:\n" + tvec.dump());
+            Debug.Log($"UNITY (Rel):   X:{boardPosCamCV.x:F3}, Y:{boardPosCamCV.y:F3}, Z:{boardPosCamCV.z:F3}");
+
+            // Conver tvec matrix to vector 
+            double x_cv = tvec.get(0, 0)[0];
+            double y_cv = tvec.get(1, 0)[0];
+            double z_cv = tvec.get(2, 0)[0];
+
+            // Get distance error
+            float errorDist = Vector3.Distance(new Vector3((float)x_cv, (float)y_cv, (float)z_cv), boardPosCamCV);
+            Debug.Log($"ERROR TOTAL: {errorDist * 1000:F2} milímetros");
+
         }
+
+        Mat rgbTemp = new Mat();
+        Calib3d.drawFrameAxes(rgbTemp, camMatrix, distCoeffs, rvec, tvec, 0.1f);
+        Imgproc.cvtColor(rgbTemp, rgba, Imgproc.COLOR_RGB2RGBA);
+        rgbTemp.Dispose();
+        OpenCVMatUtils.MatToTexture2D(rgba, tex);
+        display.texture = tex;
+
 
         obj.Dispose();
         img.Dispose();
 
         Debug.Log("Error RMS: " + err);
         Debug.Log("Matriz K:\n" + camMatrix.dump());
-        
-    }
+    } 
 }
