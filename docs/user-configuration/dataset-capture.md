@@ -1,9 +1,12 @@
 ---
 title: Dataset Capture
+parent: User Configuration
 nav_order: 5
 ---
 
 # Dataset Capture
+
+![Dataset Capture](../assets/images/Capture.png)
 
 **Object:** Capture  
 **Script:** `SceneCapture`

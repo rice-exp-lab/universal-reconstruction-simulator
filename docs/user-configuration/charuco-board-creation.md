@@ -1,11 +1,14 @@
 ---
 title: CharUco Board Creation
+parent: User Configuration
 nav_order: 6
 ---
 
 # CharUco Board Creation
 
 **Status:** Currently generates only CharUco boards. Future work includes implementing a chessboard option for debugging corner detection.  
+![Board Creation](../assets/images/CharucoCreation.png)
+
 **Object:** Charuco  
 **Script:** `ArUco`
 

@@ -1,9 +1,12 @@
 ---
 title: Camera Creation
-nav_order: 3
+parent: User Configuration
+nav_order: 2
 ---
 
 # Camera Creation
+
+![Camera rig](../assets/images/CameraCreation.png)
 
 **Object:** Camera Rig  
 **Script:** `CamCreation`

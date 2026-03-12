@@ -1,9 +1,11 @@
 ---
 title: Hierarchy Overview
-nav_order: 2
+parent: User Configuration
+nav_order: 1
 ---
 
 # Hierarchy Overview
+![Hierarchy](../assets/images/Hierarchy.png)
 
 ## Main Camera
 Captures a preview of corner detection. It is located outside the building since a camera cannot capture and display simultaneously.

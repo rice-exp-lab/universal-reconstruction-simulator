@@ -1,11 +1,13 @@
 ---
 title: Detection and Calibration
+parent: User Configuration
 nav_order: 8
 ---
 
 # Detection and Calibration
 
-**Status:** Work in progress. Marker and corner detection are currently failing. The next step is to test with a chessboard for debugging.  
+![Detection and Calibration](../assets/images/Calibration.png)
+
 **Object:** Capture  
 **Script:** `CharucoCalibrationPro`
 

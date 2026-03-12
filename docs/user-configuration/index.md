@@ -1,13 +1,18 @@
+---
+title: User Configuration
+nav_order: 3
+has_children: true
+---
+
 # User Configuration
 
-This section describes how to configure and operate the Unity environment for dataset generation and camera calibration.
+This section explains how to configure the Unity environment.
 
-## Contents
-
-- [Hierarchy Overview](hierarchy-overview)
-- [Camera Creation](camera-creation)
-- [Camera Movement](camera-movement)
-- [Dataset Capture](dataset-capture)
-- [Charuco Board Creation](charuco-board-creation)
-- [Charuco Board Movement](charuco-board-movement)
-- [Detection and Calibration](detection-and-calibration)
+## Topics
+- [Hierarchy Overview](hierarchy-overview.md)
+- [Camera Creation](camera-creation.md)
+- [Camera Movement](camera-movement.md)
+- [Dataset Capture](dataset-capture.md)
+- [Charuco Board Creation](charuco-board-creation.md)
+- [Charuco Board Movement](charuco-board-movement.md)
+- [Detection and Calibration](detection-and-calibration.md)

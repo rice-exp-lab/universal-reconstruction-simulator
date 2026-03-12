@@ -1,9 +1,12 @@
 ---
 title: Camera Movement
+parent: User Configuration
 nav_order: 4
 ---
 
 # Camera Movement
+
+![Camera Movement](../assets/images/CamMovement.png)
 
 **Status:** Functional but under refinement.  
 **Object:** `Cam_XX`  

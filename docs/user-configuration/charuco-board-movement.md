@@ -1,9 +1,12 @@
 ---
 title: CharUco Board Movement
+parent: User Configuration
 nav_order: 7
 ---
 
 # CharUco Board Movement
+
+![Charuco Movement](../assets/images/BoardMove.png)
 
 **Object:** Charuco  
 **Script:** `moveBoard`

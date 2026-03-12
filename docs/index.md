@@ -14,5 +14,8 @@ Welcome to the Rice Experimental Lab's reconstruction framework.
 
 ---
 
-## Overview
-The URS provides high-fidelity simulation and reconstruction logic for experimental physics.
+## Sections
+
+- [Getting Started](document/getting-started)
+- [Installation](document/installation)
+- [User Configuration](user-configuration/index.md)
