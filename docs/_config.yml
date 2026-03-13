@@ -1,0 +1,18 @@
+title: URS
+description: A comprehensive tool for reconstruction simulation.
+remote_theme: just-the-docs/just-the-docs
+
+# Deployment Settings
+url: "https://rice-exp-lab.github.io"
+baseurl: "/universal-reconstruction-simulator"
+
+# Branding
+logo: "/assets/images/rice.svg"
+
+# Navigation
+nav_config:
+  sort_order: alphabetical
+
+aux_links:
+  "GitHub Repository":
+    - https://github.com/rice-exp-lab/universal-reconstruction-simulator
