@@ -28,9 +28,9 @@ public class CamCreation : MonoBehaviour
         // Destry old cameras
         for (int i = transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(transform.GetChild(i).gameObject);
-        
+
         // start, character in middle
-        float startAngle = -degrees / 2f;
+        float startAngle = degrees / 2f;
 
         // step degrees
         float step;

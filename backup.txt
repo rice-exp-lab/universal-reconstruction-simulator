@@ -1,0 +1,36 @@
+    void SaveFrame(Mat corners, Mat ids)
+    {
+        Mat allBoardCorners = board.getChessboardCorners();
+        Mat frameObj = new Mat((int)ids.total(), 1, CvType.CV_32FC3);
+
+        for (int i = 0; i < ids.total(); i++)
+        {
+            int id = (int)ids.get(i, 0)[0];
+            float[] p3 = new float[3];
+            allBoardCorners.get(id, 0, p3);
+            frameObj.put(i, 0, p3);
+        }
+
+        allImagePoints.Add(corners.clone());
+        allObjectPoints.Add(frameObj);
+        Debug.Log($"Frame capturado. Total: {allImagePoints.Count}");
+    }
+
+    void RunCalibration()
+    {
+        Mat K = Mat.eye(3, 3, CvType.CV_64FC1);
+        MatOfDouble dist = new MatOfDouble(0, 0, 0, 0, 0);
+        List<Mat> rvecs = new List<Mat>(), tvecs = new List<Mat>();
+
+        double err = Calib3d.calibrateCamera(allObjectPoints, allImagePoints, new Size(rgba.cols(), rgba.rows()), K, dist, rvecs, tvecs);
+
+        Debug.Log("INTRÍNSECOS (K):\n" + K.dump());
+        Debug.Log("ERROR: " + err);
+
+        if (rvecs.Count > 0)
+        {
+            Mat R = new Mat();
+            Calib3d.Rodrigues(rvecs[rvecs.Count - 1], R);
+            Debug.Log("EXTRÍNSECOS [R|t]:\n" + R.dump() + "\n" + tvecs[tvecs.Count - 1].dump());
+        }
+    }
