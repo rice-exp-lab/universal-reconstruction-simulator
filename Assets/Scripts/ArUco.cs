@@ -84,8 +84,8 @@ public class ArUco : MonoBehaviour
         );
         charucoBoard.setLegacyPattern(USE_LEGACY_PATTERN);
 
-        int outW = markersX * pixelsPerMarker;
-        int outH = markersY * pixelsPerMarker;
+        int outW = markersX * pixelsPerMarker + 2 * marginPixels;
+        int outH = markersY * pixelsPerMarker + 2 * marginPixels;
 
         Mat gray = new Mat(outH, outW, CvType.CV_8UC1);
         charucoBoard.generateImage(new Size(outW, outH), gray, marginPixels, 2);
@@ -106,10 +106,13 @@ public class ArUco : MonoBehaviour
         float contentWidthMeters = squareLength * markersX;
         float contentHeightMeters = squareLength * markersY;
 
-        float metersPerPixel = contentWidthMeters / (markersX * pixelsPerMarker);
+        float metersPerPixel = (squareLength * markersX) / (markersX * pixelsPerMarker);
 
-        float totalWidthMeters = _tex.width * metersPerPixel;
-        float totalHeightMeters = _tex.height * metersPerPixel;
+        float totalWidthMeters = outW * metersPerPixel;
+        float totalHeightMeters = outH * metersPerPixel;
+
+        Debug.Log($"Total Width: {totalWidthMeters} m");
+        Debug.Log($"Total Height: {totalHeightMeters} m");
 
         RectTransform rt = targetRawImage.rectTransform;
         float aspect = (float)_tex.height / _tex.width;

@@ -25,9 +25,9 @@ public class CharucoCalibratorPro : MonoBehaviour
     public float squareLength = 0.07f;
     public float markerLength = 0.1f;
 
-    //[Header("Image Resolution")]
-    //public int width;
-    //public int height;
+    [Header("Image Resolution")]
+    public int imgWidth = 1280;
+    public int imgHeight =720;
 
     [Header("Save Results")]
     public bool savePng = false;
@@ -58,17 +58,23 @@ public class CharucoCalibratorPro : MonoBehaviour
             - focal length=3.317
             -FOV=80 (horizontal)
             -aperture=f/2.7
+
+            -aspect ratio 16:9
          */
 
         // create render texture -> same aspect as camera
-        float sensorAspect = cameraCapture.sensorSize.x / cameraCapture.sensorSize.y;
-        int targetWidth = 1280;
-        int targetHeight = Mathf.RoundToInt(targetWidth / sensorAspect);
+        //float sensorAspect = cameraCapture.sensorSize.x / cameraCapture.sensorSize.y;
+        int targetWidth = imgWidth;//1280;
+        int targetHeight = imgHeight;//Mathf.RoundToInt(targetWidth / sensorAspect);
         //int w = 1280; int h = 720;
         rt = new RenderTexture(targetWidth, targetHeight, 24);
         // set camera same size as render texture
         cameraCapture.targetTexture = rt;
-        cameraCapture.aspect = sensorAspect; //(float)rt.width / (float)rt.height;
+
+        // aspect 16:9
+        float effectiveSensorHeight = cameraCapture.sensorSize.x / ((float)targetWidth / targetHeight);
+        cameraCapture.sensorSize = new Vector2(cameraCapture.sensorSize.x, effectiveSensorHeight);
+        cameraCapture.aspect = (float)targetWidth / targetHeight; //sensorAspect;
 
         tex = new Texture2D(targetWidth, targetHeight, TextureFormat.RGBA32, false);
         rgba = new Mat(targetHeight, targetWidth, CvType.CV_8UC4);
