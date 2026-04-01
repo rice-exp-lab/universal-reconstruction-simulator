@@ -2,7 +2,8 @@ using OpenCVForUnity.ObjdetectModule;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class charucoParams : MonoBehaviour
+[CreateAssetMenu(fileName ="Charuco", menuName = "Charuco/SetParameters")]
+public class charucoParams : ScriptableObject
 {
     public enum ArUcoDictionary
     {
@@ -25,30 +26,17 @@ public class charucoParams : MonoBehaviour
         DICT_ARUCO_ORIGINAL = Objdetect.DICT_ARUCO_ORIGINAL,
     }
 
-    [Header("UI")]
-    public RawImage targetRawImage;
-
     [Header("Dictionary")]
     public ArUcoDictionary dictionaryId = ArUcoDictionary.DICT_5X5_250;
 
+
     [Header("GridBoard")]
     [Tooltip("Number of cols")]
-    public int markersX = 5;
+    public int squaresX = 5;
     [Tooltip("Number of rows")]
-    public int markersY = 7;
+    public int squaresY = 7;
     [Tooltip("Marker side length")]
     public float markerLength = 0.07f;
     [Tooltip("Checker side length")]
-    public float checkerLength = 0.1f;
-
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
+    public float squareLength = 0.1f;
 }

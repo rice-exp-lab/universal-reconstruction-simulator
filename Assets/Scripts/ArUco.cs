@@ -11,6 +11,7 @@ using UnityEngine.UI;
 
 public class ArUco : MonoBehaviour
 {
+    /*
     public enum ArUcoDictionary
     {
         DICT_4X4_50 = Objdetect.DICT_4X4_50,
@@ -31,10 +32,11 @@ public class ArUco : MonoBehaviour
         DICT_7X7_1000 = Objdetect.DICT_7X7_1000,
         DICT_ARUCO_ORIGINAL = Objdetect.DICT_ARUCO_ORIGINAL,
     }
+    */
 
     [Header("UI")]
     public RawImage targetRawImage;
-
+    /*
     [Header("Dictionary")]
     public ArUcoDictionary dictionaryId = ArUcoDictionary.DICT_5X5_250;
 
@@ -47,22 +49,26 @@ public class ArUco : MonoBehaviour
     public float markerLength = 0.07f;
     [Tooltip("Checker side length")]
     public float checkerLength = 0.1f;
+    */
     //[Tooltip("Board side length")]
     //public float boardWidthMeters = 0.20f;
     //public float markerSeparation = 0.01f; // unidad “real” relativa
+    
     private const int CHARUCO_MARKER_FIRST_MARKER = 1;
     private const int CHARUCO_BOARD_MARGIN_SIZE = 10;
     private const bool USE_LEGACY_PATTERN = false;
 
-    //[Header("Output image")]
+    [Header("Board Configuration")]
+    public charucoParams charucoParams;
     public int pixelsPerMarker = 240; 
     public int marginPixels = 20;
-    //[Tooltip("The size of the output marker image (px).")]
-    //public int MarkerSize = 1000;
+    private int dictionaryId, markersX, markersY;
+    private float checkerLength;
+    private float markerLength;
+
 
     private Texture2D _tex;
     private Mat _markerImg;
-
 
     [ContextMenu("Build board")]
     public void board()
@@ -73,7 +79,13 @@ public class ArUco : MonoBehaviour
             return;
         }
 
-        Dictionary dict = Objdetect.getPredefinedDictionary((int)dictionaryId);
+        dictionaryId = (int)charucoParams.dictionaryId;
+        checkerLength = charucoParams.squareLength;
+        markerLength = charucoParams.markerLength;
+        markersX = charucoParams.squaresX;
+        markersY = charucoParams.squaresY;
+
+        Dictionary dict = Objdetect.getPredefinedDictionary(dictionaryId);
 
         float squareLength = checkerLength; //boardWidthMeters / markersX;
         float markerLengthM = Math.Min(markerLength, squareLength * 0.6f); 
