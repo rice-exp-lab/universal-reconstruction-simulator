@@ -25,6 +25,7 @@ public class CamCreation : MonoBehaviour
     [ContextMenu("Build Rig")] // https://docs.unity3d.com/6000.3/Documentation/ScriptReference/ContextMenu.html
     public void BuildRig()
     {
+        float radiusNeg = radius * -1;
         // Destry old cameras
         for (int i = transform.childCount - 1; i >= 0; i--)
             DestroyImmediate(transform.GetChild(i).gameObject);
@@ -47,9 +48,9 @@ public class CamCreation : MonoBehaviour
             float rad = angleDeg * Mathf.Deg2Rad;
 
             Vector3 pos = new Vector3(
-                Mathf.Cos(rad) * radius,
+                Mathf.Cos(rad) * radiusNeg,
                 height,
-                Mathf.Sin(rad) * radius
+                Mathf.Sin(rad) * radiusNeg
             );
             GameObject camGO = Instantiate(cameraPrefab, transform);
             camGO.name = $"Cam_{i+1:00}";
