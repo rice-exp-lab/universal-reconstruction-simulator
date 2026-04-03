@@ -30,7 +30,8 @@ public class CamCreation : MonoBehaviour
             DestroyImmediate(transform.GetChild(i).gameObject);
 
         // start, character in middle
-        float startAngle = degrees / 2f;
+        //float startAngle = degrees / 2f;
+        float startAngle = 100-degrees;
 
         // step degrees
         float step;

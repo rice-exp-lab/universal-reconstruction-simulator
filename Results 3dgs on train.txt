@@ -1,0 +1,5 @@
+Metrics calculated using train images
+
+- PSNR: 30.9887123
+- SSIM: 0.9859461
+- LPIPS: 0.0289287
