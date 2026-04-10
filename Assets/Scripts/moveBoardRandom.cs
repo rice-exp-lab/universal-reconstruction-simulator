@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class moveBoard : MonoBehaviour
+public class moveBoardRandom : MonoBehaviour
 {
     public float maxRotation = 1f;
     public float minRotation = -1f;

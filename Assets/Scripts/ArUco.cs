@@ -59,6 +59,7 @@ public class ArUco : MonoBehaviour
     private const bool USE_LEGACY_PATTERN = false;
 
     [Header("Board Configuration")]
+    public Transform cornerReference;
     public charucoParams charucoParams;
     public int pixelsPerMarker = 240; 
     public int marginPixels = 20;
@@ -129,6 +130,10 @@ public class ArUco : MonoBehaviour
         RectTransform rt = targetRawImage.rectTransform;
         float aspect = (float)_tex.height / _tex.width;
         rt.sizeDelta = new Vector2(totalWidthMeters, totalHeightMeters);
+
+        
+        targetRawImage.transform.position = new Vector3(0, (markersY * squareLength) / 2, 0);
+        cornerReference.localPosition = new Vector3((markersX * squareLength) / 2, (markersY * squareLength) / 2, 0);
 
         gray.Dispose();
         rgb.Dispose();
