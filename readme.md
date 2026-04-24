@@ -37,4 +37,6 @@ repo/
 
 ├── Midterm/             # LaTeX source and compiled midterm report
 
+├── Final/             # LaTeX source and compiled final report
+
 └── README.md
