@@ -31,7 +31,7 @@ public class stereoCalib : MonoBehaviour
     //[Header("Calibration")]
     //[Tooltip("RMS threshold to consider calibration valid")]
     private double rmsThreshold = 1.0;
-    private int minFrames = 3;
+    private int minFrames = 15;
     private int minCommonIds = 6;
 
     [Header("Save Results")]
@@ -68,6 +68,9 @@ public class stereoCalib : MonoBehaviour
         rgba2 = new Mat(imgHeight, imgWidth, CvType.CV_8UC4);
         gray2 = new Mat(imgHeight, imgWidth, CvType.CV_8UC1);
 
+        ConfigurePreview(display1);
+        ConfigurePreview(display2);
+
         squaresX = charucoParams.squaresX;
         squaresY = charucoParams.squaresY;
         squareLength = charucoParams.squareLength;
@@ -82,6 +85,7 @@ public class stereoCalib : MonoBehaviour
         detectorParams.set_polygonalApproxAccuracyRate(0.05);
         detectorParams.set_minMarkerPerimeterRate(0.02);
         detectorParams.set_maxErroneousBitsInBorderRate(0.6);
+        detectorParams.set_markerBorderBits(1);
 
         CharucoParameters charucoParameters = new CharucoParameters();
         charucoParameters.set_minMarkers(2);
@@ -122,6 +126,22 @@ public class stereoCalib : MonoBehaviour
         camera.aspect     = (float)imgWidth / imgHeight;
     }
 
+    void ConfigurePreview(RawImage display)
+    {
+        if (display == null)
+            return;
+
+        // RawImage tint multiplies every pixel. White preserves the camera colors.
+        display.color = Color.white;
+
+        AspectRatioFitter fitter = display.GetComponent<AspectRatioFitter>();
+        if (fitter == null)
+            fitter = display.gameObject.AddComponent<AspectRatioFitter>();
+
+        fitter.aspectMode = AspectRatioFitter.AspectMode.WidthControlsHeight;
+        fitter.aspectRatio = (float)imgWidth / imgHeight;
+    }
+
     private void cameraDetect(RenderTexture rt, Texture2D tex, Mat gray, Mat rgba,
                                RawImage display,
                                out Mat charucoCorners, out Mat charucoIds)
@@ -129,9 +149,11 @@ public class stereoCalib : MonoBehaviour
         charucoCorners = new Mat();
         charucoIds     = new Mat();
 
+        RenderTexture previousActive = RenderTexture.active;
         RenderTexture.active = rt;
         tex.ReadPixels(new UnityEngine.Rect(0, 0, tex.width, tex.height), 0, 0);
-        tex.Apply();
+        tex.Apply(false);
+        RenderTexture.active = previousActive;
 
         OpenCVMatUtils.Texture2DToMat(tex, rgba);
         Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY);
@@ -143,7 +165,7 @@ public class stereoCalib : MonoBehaviour
         arucoDetector.detectMarkers(gray, markerCorners, markerIds, rejected);
         detector.detectBoard(gray, charucoCorners, charucoIds, markerCorners, markerIds);
 
-        Debug.Log($"Corners: {charucoIds.total()}, Markers: {markerIds.total()}");
+        // Debug.Log($"Corners: {charucoIds.total()}, Markers: {markerIds.total()}");
 
         if (charucoIds.total() > 0){
             DrawResults(rgba, markerCorners, markerIds, charucoCorners, charucoIds);
@@ -218,10 +240,6 @@ public class stereoCalib : MonoBehaviour
         for (int i = 0; i < (int)ids.total(); i++)
             idToIndex[(int)ids.get(i, 0)[0]] = i;
 
-        // convert format
-        Mat corners32f = new Mat();
-        corners.convertTo(corners32f, CvType.CV_32FC2);
-
         Mat filtered = new Mat(commonIds.Count, 1, CvType.CV_32FC2);
         for (int i = 0; i < commonIds.Count; i++)
         {
@@ -229,7 +247,6 @@ public class stereoCalib : MonoBehaviour
             double[] c   = corners.get(srcIdx, 0);
             filtered.put(i, 0, c);
         }
-        corners32f.Dispose();
         return filtered;
     }
 
@@ -256,60 +273,69 @@ public class stereoCalib : MonoBehaviour
         Mat             camMatrix2  = Mat.eye(3, 3, CvType.CV_64FC1);
         MatOfDouble     distCoeffs1 = new MatOfDouble(0, 0, 0, 0, 0);
         MatOfDouble     distCoeffs2 = new MatOfDouble(0, 0, 0, 0, 0);
-        List<Mat>       rvecs       = new List<Mat>();
-        List<Mat>       tvecs       = new List<Mat>();
+        List<Mat>       rvecs1      = new List<Mat>();
+        List<Mat>       tvecs1      = new List<Mat>();
+        List<Mat>       rvecs2      = new List<Mat>();
+        List<Mat>       tvecs2      = new List<Mat>();
         Size            imageSize   = gray1.size();
 
-        // intrisincs
-        double rms1 = Calib3d.calibrateCamera(
-            allObjectPoints, allImagePoints1, imageSize,
-            camMatrix1, distCoeffs1, rvecs, tvecs);
-
-        double rms2 = Calib3d.calibrateCamera(
-            allObjectPoints, allImagePoints2, imageSize,
-            camMatrix2, distCoeffs2, rvecs, tvecs);
-
-        Debug.Log($"RMS cam1: {rms1:F4}  |  RMS cam2: {rms2:F4}");
-
-        if (rms1 > rmsThreshold || rms2 > rmsThreshold)
-        {
-            Debug.LogWarning("RMS high for individual calibration. Check captures");
-            return;
-        }
-
-        // stereo
         Mat R = new Mat();
         Mat T = new Mat();
         Mat E = new Mat();
         Mat F = new Mat();
 
-        double rmsS = Calib3d.stereoCalibrate(
-            allObjectPoints,
-            allImagePoints1, allImagePoints2,
-            camMatrix1, distCoeffs1,
-            camMatrix2, distCoeffs2,
-            imageSize, R, T, E, F,
-            Calib3d.CALIB_FIX_INTRINSIC);
-
-        Debug.Log($"Stereo RMS: {rmsS:F4}");
-
-        if (rmsS < rmsThreshold)
+        try
         {
-            Debug.Log("Stereo Calibration OK");
-            Debug.Log("K1:\n"  + camMatrix1.dump());
-            Debug.Log("K2:\n"  + camMatrix2.dump());
-            Debug.Log("R:\n"   + R.dump());
-            Debug.Log("T:\n"   + T.dump());
-            compareCalibration(R, T, F);
-        }
-        else
-        {
-            Debug.LogWarning($"RMS High({rmsS:F4})");
-        }
+            double rms1 = Calib3d.calibrateCamera(
+                allObjectPoints, allImagePoints1, imageSize,
+                camMatrix1, distCoeffs1, rvecs1, tvecs1);
 
-        R.Dispose(); T.Dispose(); E.Dispose(); F.Dispose();
-        foreach (var m in rvecs) m.Dispose();
-        foreach (var m in tvecs) m.Dispose();
+            double rms2 = Calib3d.calibrateCamera(
+                allObjectPoints, allImagePoints2, imageSize,
+                camMatrix2, distCoeffs2, rvecs2, tvecs2);
+
+            Debug.Log($"RMS cam1: {rms1:F4}  |  RMS cam2: {rms2:F4}");
+
+            if (rms1 > rmsThreshold || rms2 > rmsThreshold)
+            {
+                Debug.LogWarning("RMS high for individual calibration. Check captures");
+                return;
+            }
+
+            double rmsS = Calib3d.stereoCalibrate(
+                allObjectPoints,
+                allImagePoints1, allImagePoints2,
+                camMatrix1, distCoeffs1,
+                camMatrix2, distCoeffs2,
+                imageSize, R, T, E, F,
+                Calib3d.CALIB_FIX_INTRINSIC);
+
+            Debug.Log($"Stereo RMS: {rmsS:F4}");
+
+            if (rmsS < rmsThreshold)
+            {
+                Debug.Log("Stereo Calibration OK");
+                Debug.Log("K1:\n"  + camMatrix1.dump());
+                Debug.Log("K2:\n"  + camMatrix2.dump());
+                Debug.Log("R:\n"   + R.dump());
+                Debug.Log("T:\n"   + T.dump());
+                compareCalibration(R, T, F);
+            }
+            else
+            {
+                Debug.LogWarning($"RMS High({rmsS:F4})");
+            }
+        }
+        finally
+        {
+            R.Dispose(); T.Dispose(); E.Dispose(); F.Dispose();
+            camMatrix1.Dispose(); camMatrix2.Dispose();
+            distCoeffs1.Dispose(); distCoeffs2.Dispose();
+            foreach (var m in rvecs1) m.Dispose();
+            foreach (var m in tvecs1) m.Dispose();
+            foreach (var m in rvecs2) m.Dispose();
+            foreach (var m in tvecs2) m.Dispose();
+        }
     }
 
     void compareCalibration(Mat R, Mat tvec, Mat F)
@@ -331,7 +357,8 @@ public class stereoCalib : MonoBehaviour
         Mat R_cv_t = new Mat();
         Core.transpose(R, R_cv_t);
         Mat R_err = new Mat();
-        Core.gemm(rotMatrixUnityCV3, R_cv_t, 1.0, new Mat(), 0.0, R_err);
+        Mat empty = new Mat();
+        Core.gemm(rotMatrixUnityCV3, R_cv_t, 1.0, empty, 0.0, R_err);
 
         double trace = R_err.get(0, 0)[0] + R_err.get(1, 1)[0] + R_err.get(2, 2)[0];
         double cosTheta = (trace - 1.0) / 2.0;
@@ -365,36 +392,86 @@ public class stereoCalib : MonoBehaviour
         Debug.Log($"Distance error: {errorDist * 1000:F2} millimeters");
 
 
-        // Get evaluation for F
-        Mat pts1 = allImagePoints1[0];
-        Mat pts2 = allImagePoints2[0];
+        Debug.Log($"Sampson RMS: {ComputeSampsonRms(F):F4} px");
 
-        //u,v
-        double[] p1 = pts1.get(0, 0); 
-        double[] p2 = pts2.get(0, 0);
+        rotMatrixUnityCV3.Dispose();
+        R_cv_t.Dispose();
+        R_err.Dispose();
+        empty.Dispose();
+    }
 
-        // x,y,1
-        Mat x1 = new Mat(3, 1, CvType.CV_64F);
-        x1.put(0, 0, p1[0]);
-        x1.put(1, 0, p1[1]);
-        x1.put(2, 0, 1.0);
+    double ComputeSampsonRms(Mat F)
+    {
+        double[,] f = new double[3, 3];
+        for (int row = 0; row < 3; row++)
+            for (int col = 0; col < 3; col++)
+                f[row, col] = F.get(row, col)[0];
 
-        Mat x2 = new Mat(3, 1, CvType.CV_64F);
-        x2.put(0, 0, p2[0]);
-        x2.put(1, 0, p2[1]);
-        x2.put(2, 0, 1.0);
+        double sumSquared = 0.0;
+        int count = 0;
 
-        // temp = F * x1
-        Mat temp = new Mat();
-        Core.gemm(F, x1, 1.0, new Mat(), 0.0, temp);
+        for (int frame = 0; frame < allImagePoints1.Count; frame++)
+        {
+            Mat pts1 = allImagePoints1[frame];
+            Mat pts2 = allImagePoints2[frame];
+            int pointCount = (int)System.Math.Min(pts1.total(), pts2.total());
 
-        // val = x2^T * temp
-        Mat result = new Mat();
-        Core.gemm(x2.t(), temp, 1.0, new Mat(), 0.0, result);
+            for (int i = 0; i < pointCount; i++)
+            {
+                double[] p1 = pts1.get(i, 0);
+                double[] p2 = pts2.get(i, 0);
+                double x1 = p1[0], y1 = p1[1];
+                double x2 = p2[0], y2 = p2[1];
 
-        double val = result.get(0, 0)[0];
+                double fx1x = f[0, 0] * x1 + f[0, 1] * y1 + f[0, 2];
+                double fx1y = f[1, 0] * x1 + f[1, 1] * y1 + f[1, 2];
+                double fx1z = f[2, 0] * x1 + f[2, 1] * y1 + f[2, 2];
+                double ftx2x = f[0, 0] * x2 + f[1, 0] * y2 + f[2, 0];
+                double ftx2y = f[0, 1] * x2 + f[1, 1] * y2 + f[2, 1];
+                double residual = x2 * fx1x + y2 * fx1y + fx1z;
+                double denominator = fx1x * fx1x + fx1y * fx1y
+                                   + ftx2x * ftx2x + ftx2y * ftx2y;
 
-        Debug.Log($"Epipolar error: {val}");
+                if (denominator > 1e-12)
+                {
+                    sumSquared += residual * residual / denominator;
+                    count++;
+                }
+            }
+        }
 
+        return count > 0 ? System.Math.Sqrt(sumSquared / count) : double.NaN;
+    }
+
+    void OnDestroy()
+    {
+        foreach (var m in allObjectPoints) m.Dispose();
+        foreach (var m in allImagePoints1) m.Dispose();
+        foreach (var m in allImagePoints2) m.Dispose();
+
+        rgba1?.Dispose(); gray1?.Dispose();
+        rgba2?.Dispose(); gray2?.Dispose();
+        board?.Dispose();
+        detector?.Dispose();
+        arucoDetector?.Dispose();
+
+        if (cameraCapture1 != null && cameraCapture1.targetTexture == rt1)
+            cameraCapture1.targetTexture = null;
+        if (cameraCapture2 != null && cameraCapture2.targetTexture == rt2)
+            cameraCapture2.targetTexture = null;
+
+        ReleaseRenderTexture(rt1);
+        ReleaseRenderTexture(rt2);
+        if (tex1 != null) Destroy(tex1);
+        if (tex2 != null) Destroy(tex2);
+    }
+
+    void ReleaseRenderTexture(RenderTexture rt)
+    {
+        if (rt == null)
+            return;
+
+        rt.Release();
+        Destroy(rt);
     }
 }

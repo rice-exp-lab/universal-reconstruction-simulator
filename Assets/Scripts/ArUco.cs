@@ -1,4 +1,4 @@
-using OpenCVForUnity.CoreModule;
+Ôªøusing OpenCVForUnity.CoreModule;
 using OpenCVForUnity.ImgprocModule;
 using OpenCVForUnity.ObjdetectModule;
 using OpenCVForUnity.UnityIntegration;
@@ -52,7 +52,7 @@ public class ArUco : MonoBehaviour
     */
     //[Tooltip("Board side length")]
     //public float boardWidthMeters = 0.20f;
-    //public float markerSeparation = 0.01f; // unidad ìrealî relativa
+    //public float markerSeparation = 0.01f; // unidad ‚Äúreal‚Äù relativa
     
     private const int CHARUCO_MARKER_FIRST_MARKER = 1;
     private const int CHARUCO_BOARD_MARGIN_SIZE = 10;
@@ -89,10 +89,9 @@ public class ArUco : MonoBehaviour
         Dictionary dict = Objdetect.getPredefinedDictionary(dictionaryId);
 
         float squareLength = checkerLength; //boardWidthMeters / markersX;
-        float markerLengthM = Math.Min(markerLength, squareLength * 0.6f); 
 
         CharucoBoard charucoBoard = new CharucoBoard(new Size(markersX, markersY),
-            squareLength, markerLengthM,
+            squareLength, markerLength,
             dict
         );
         charucoBoard.setLegacyPattern(USE_LEGACY_PATTERN);
@@ -101,14 +100,21 @@ public class ArUco : MonoBehaviour
         int outH = markersY * pixelsPerMarker + 2 * marginPixels;
 
         Mat gray = new Mat(outH, outW, CvType.CV_8UC1);
-        charucoBoard.generateImage(new Size(outW, outH), gray, marginPixels, 2);
+        charucoBoard.generateImage(new Size(outW, outH), gray, marginPixels, 1);
 
         Mat rgb = new Mat();
         Imgproc.cvtColor(gray, rgb, Imgproc.COLOR_GRAY2RGB);
 
         if (_tex == null || _tex.width != outW || _tex.height != outH)
-            _tex = new Texture2D(outW, outH, TextureFormat.RGB24, false);
+        {
+            if (_tex != null)
+                DestroyImmediate(_tex);
 
+            _tex = new Texture2D(outW, outH, TextureFormat.RGB24, false);
+            _tex.filterMode = FilterMode.Point;
+            _tex.wrapMode = TextureWrapMode.Clamp;
+            _tex.anisoLevel = 0;
+        }
         OpenCVMatUtils.MatToTexture2D(rgb, _tex);
 
         targetRawImage.color = Color.white;
@@ -133,10 +139,16 @@ public class ArUco : MonoBehaviour
 
         
         targetRawImage.transform.position = new Vector3(0, (markersY * squareLength) / 2, 0);
-        cornerReference.localPosition = new Vector3((markersX * squareLength) / 2, (markersY * squareLength) / 2, 0);
+        cornerReference.localPosition = new Vector3(-(markersX * squareLength) / 2, (markersY * squareLength) / 2, 0);
 
         gray.Dispose();
         rgb.Dispose();
+        charucoBoard.Dispose();
     }
 
+    void OnDestroy()
+    {
+        if (_tex != null)
+            Destroy(_tex);
+    }
 }

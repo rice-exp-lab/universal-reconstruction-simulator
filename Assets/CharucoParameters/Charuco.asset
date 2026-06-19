@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7aa19e902f5f323408d2e3b9f6c3af76, type: 3}
   m_Name: Charuco
   m_EditorClassIdentifier: Assembly-CSharp::charucoParams
-  dictionaryId: 2
-  squaresX: 7
-  squaresY: 7
-  markerLength: 0.018
-  squareLength: 0.024
+  dictionaryId: 0
+  squaresX: 4
+  squaresY: 5
+  markerLength: 0.037
+  squareLength: 0.05
