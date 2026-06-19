@@ -1,4 +1,4 @@
-using OpenCVForUnity.ArucoModule;
+﻿using OpenCVForUnity.ArucoModule;
 using OpenCVForUnity.Calib3dModule;
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.ImgcodecsModule;
@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Playables;
 using UnityEngine.UI;
 
 public class monoCalibration : MonoBehaviour
@@ -43,14 +42,8 @@ public class monoCalibration : MonoBehaviour
     private CharucoDetector detector;
     private ArucoDetector arucoDetector;
     private int captureIndex = 0;
-    private List<Mat> allImagePoints = new List<Mat>();
-    private List<Mat> allObjectPoints = new List<Mat>();
-    private Mat _camMatrix;
-    private MatOfDouble _distCoeffs;
-    private Size imageSize = new Size();
-    List<Mat> allCharucoCorners = new List<Mat>();
-    List<Mat> allCharucoIds = new List<Mat>();
-    List<Mat> filteredImages = new List<Mat>();
+    private readonly List<Mat> allCharucoCorners = new List<Mat>();
+    private readonly List<Mat> allCharucoIds = new List<Mat>();
 
     void Start()
     {
@@ -107,6 +100,7 @@ public class monoCalibration : MonoBehaviour
         detectorParams.set_polygonalApproxAccuracyRate(0.05);
         detectorParams.set_minMarkerPerimeterRate(0.02);
         detectorParams.set_maxErroneousBitsInBorderRate(0.6);
+        detectorParams.set_markerBorderBits(1);
 
         CharucoParameters charucoParameters = new CharucoParameters();
         charucoParameters.set_minMarkers(2);
@@ -120,9 +114,11 @@ public class monoCalibration : MonoBehaviour
     {
         // --- DETECTION ---
         // Read camera
+        RenderTexture previousActive = RenderTexture.active;
         RenderTexture.active = rt;
         tex.ReadPixels(new UnityEngine.Rect(0, 0, tex.width, tex.height), 0, 0);
-        tex.Apply();
+        tex.Apply(false);
+        RenderTexture.active = previousActive;
         // Convert texture to mat
         OpenCVMatUtils.Texture2DToMat(tex, rgba);
         Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY);
@@ -137,43 +133,42 @@ public class monoCalibration : MonoBehaviour
         List<Mat> rejected = new List<Mat>();
         Mat markerIds = new Mat();
 
-        arucoDetector.detectMarkers(gray,markerCorners,markerIds,rejected);
-        if (rejected.Count > 0)
+        try
         {
-            Debug.Log($"rejected: {rejected.Count}");
+            arucoDetector.detectMarkers(gray,markerCorners,markerIds,rejected);
+            if (rejected.Count > 0)
+                Debug.Log($"rejected: {rejected.Count}");
+
+            detector.detectBoard(gray, charucoCorners, charucoIds, markerCorners, markerIds);
+            Debug.Log($"Corners: {charucoIds.total()}, Markers: {markerIds.total()}");
+            Debug.Log($"Mat size: {gray.cols()}x{gray.rows()} | RT size: {rt.width}x{rt.height}");
+
+            if (charucoIds.total() > 0)
+            {
+                Mat rgbTemp = new Mat();
+                Imgproc.cvtColor(rgba, rgbTemp, Imgproc.COLOR_RGBA2RGB);
+                Objdetect.drawDetectedMarkers(rgbTemp, markerCorners, markerIds, new Scalar(255, 0, 0));
+                Objdetect.drawDetectedCornersCharuco(rgbTemp, charucoCorners, charucoIds, new Scalar(0, 255, 0));
+                Imgproc.cvtColor(rgbTemp, rgba, Imgproc.COLOR_RGB2RGBA);
+                rgbTemp.Dispose();
+            }
+
+            OpenCVMatUtils.MatToTexture2D(rgba, tex);
+            display.texture = tex;
+
+            var kb = Keyboard.current;
+            if (kb != null && kb.spaceKey.wasPressedThisFrame)
+                SaveFrame(charucoCorners, charucoIds);
+            if (kb != null && kb.cKey.wasPressedThisFrame)
+                RunCalibration();
         }
-
-        // Detection. detectBoard runs detectMarkers if none pass
-        detector.detectBoard(gray, charucoCorners, charucoIds, markerCorners, markerIds);
-        Debug.Log($"Corners: {charucoIds.total()}, Markers: {markerIds.total()}");
-        Debug.Log($"Mat size: {gray.cols()}x{gray.rows()} | RT size: {rt.width}x{rt.height}");
-
-        if (charucoIds.total() > 0)
+        finally
         {
-            Debug.Log("Drawing results");
-            Mat rgbTemp = new Mat();
-            Imgproc.cvtColor(rgba, rgbTemp, Imgproc.COLOR_RGBA2RGB);
-            Objdetect.drawDetectedMarkers(rgbTemp, markerCorners, markerIds, new Scalar(255, 0, 0));
-            Objdetect.drawDetectedCornersCharuco(rgbTemp, charucoCorners, charucoIds, new Scalar(0, 255, 0));
-            Imgproc.cvtColor(rgbTemp, rgba, Imgproc.COLOR_RGB2RGBA);
-            rgbTemp.Dispose();
-        }
-
-        // Show results in the preview
-        OpenCVMatUtils.MatToTexture2D(rgba, tex);
-        display.texture = tex;
-
-
-        // --- CALIBRATION ---
-        var kb = Keyboard.current;
-        if (kb.spaceKey.wasPressedThisFrame)
-        {
-            SaveFrame(charucoCorners, charucoIds);
-        }
-        if (kb.cKey.wasPressedThisFrame)
-        {
-            RunCalibration();
-            
+            charucoCorners.Dispose();
+            charucoIds.Dispose();
+            markerCorners.ForEach(m => m.Dispose());
+            markerIds.Dispose();
+            rejected.ForEach(m => m.Dispose());
         }
     }
 
@@ -213,9 +208,6 @@ public class monoCalibration : MonoBehaviour
             Mat corners = allCharucoCorners[i];
             Mat ids = allCharucoIds[i];
 
-            Mat corners32f = new Mat();
-            corners.convertTo(corners32f, CvType.CV_32FC2);
-
             if (ids.total() > 4)
             {
                 Mat objP = new Mat((int)ids.total(), 1, CvType.CV_32FC3);
@@ -248,8 +240,7 @@ public class monoCalibration : MonoBehaviour
         );
 
         // get extrinsics
-        int idx = allCharucoCorners.Count - 1;
-        //int idx = 0;
+        int idx = allObjectPoints.Count - 1;
 
         MatOfPoint3f obj = new MatOfPoint3f(allObjectPoints[idx]);
         MatOfPoint2f img = new MatOfPoint2f(allImagePoints[idx]);
@@ -258,6 +249,7 @@ public class monoCalibration : MonoBehaviour
         Mat tvec = new Mat();
         bool ok = Calib3d.solvePnP(obj, img, camMatrix, distCoeffs, rvec, tvec);
 
+        Mat axesImage = null;
         if (ok)
         {
             Mat R = new Mat();
@@ -283,7 +275,8 @@ public class monoCalibration : MonoBehaviour
             Mat R_cv_t = new Mat();
             Core.transpose(R, R_cv_t);
             Mat R_err = new Mat();
-            Core.gemm(rotMatrixUnityCV3,R_cv_t,1.0,new Mat(),0.0,R_err);
+            Mat empty = new Mat();
+            Core.gemm(rotMatrixUnityCV3, R_cv_t, 1.0, empty, 0.0, R_err);
 
             double trace = R_err.get(0, 0)[0] + R_err.get(1, 1)[0] + R_err.get(2, 2)[0];
             double cosTheta = (trace - 1.0) / 2.0;
@@ -314,22 +307,56 @@ public class monoCalibration : MonoBehaviour
 
             // Get distance error
             float errorDist = Vector3.Distance(new Vector3((float)x_cv, (float)y_cv, (float)z_cv), boardPosCamCV);
-            Debug.Log($"ERROR TOTAL: {errorDist * 1000:F2} mil�metros");
+            Debug.Log($"ERROR TOTAL: {errorDist * 1000:F2} milímetros");
 
+            axesImage = rgba.clone();
+            Calib3d.drawFrameAxes(axesImage, camMatrix, distCoeffs, rvec, tvec, 0.1f);
+            OpenCVMatUtils.MatToTexture2D(axesImage, tex);
+            display.texture = tex;
+
+            R.Dispose();
+            rotMatrixUnityCV3.Dispose();
+            R_cv_t.Dispose();
+            R_err.Dispose();
+            empty.Dispose();
         }
 
-        Mat rgbTemp = new Mat();
-        Calib3d.drawFrameAxes(rgbTemp, camMatrix, distCoeffs, rvec, tvec, 0.1f);
-        Imgproc.cvtColor(rgbTemp, rgba, Imgproc.COLOR_RGB2RGBA);
-        rgbTemp.Dispose();
-        OpenCVMatUtils.MatToTexture2D(rgba, tex);
-        display.texture = tex;
-
-
+        axesImage?.Dispose();
         obj.Dispose();
         img.Dispose();
+        rvec.Dispose();
+        tvec.Dispose();
 
         Debug.Log("Error RMS: " + err);
         Debug.Log("Matriz K:\n" + camMatrix.dump());
-    } 
+
+        camMatrix.Dispose();
+        distCoeffs.Dispose();
+        foreach (var m in rvecs) m.Dispose();
+        foreach (var m in tvecs) m.Dispose();
+        foreach (var m in allObjectPoints) m.Dispose();
+    }
+
+    void OnDestroy()
+    {
+        foreach (var m in allCharucoCorners) m.Dispose();
+        foreach (var m in allCharucoIds) m.Dispose();
+
+        rgba?.Dispose();
+        gray?.Dispose();
+        board?.Dispose();
+        detector?.Dispose();
+        arucoDetector?.Dispose();
+
+        if (cameraCapture != null && cameraCapture.targetTexture == rt)
+            cameraCapture.targetTexture = null;
+
+        if (rt != null)
+        {
+            rt.Release();
+            Destroy(rt);
+        }
+        if (tex != null)
+            Destroy(tex);
+    }
 }

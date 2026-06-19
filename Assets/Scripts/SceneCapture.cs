@@ -130,6 +130,8 @@ public class RigCaptureSequence : MonoBehaviour
             foreach (var cam in cams)
             {
                 // Render
+                RenderTexture previousTarget = cam.targetTexture;
+                RenderTexture previousActive = RenderTexture.active;
                 cam.targetTexture = rts[cam];
                 cam.Render();
 
@@ -138,8 +140,8 @@ public class RigCaptureSequence : MonoBehaviour
                 readTex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 readTex.Apply();
 
-                cam.targetTexture = null;
-                RenderTexture.active = null;
+                cam.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
 
                 // Save image
                 byte[] png = readTex.EncodeToPNG();
@@ -166,6 +168,7 @@ public class RigCaptureSequence : MonoBehaviour
         foreach (var kv in rts)
         {
             kv.Value.Release();
+            Destroy(kv.Value);
         }
         rts.Clear();
 
@@ -174,6 +177,22 @@ public class RigCaptureSequence : MonoBehaviour
         isCapturing = false;
 
         Debug.Log($"Capture complete. Saved to:\n{runDir} for \n{cams.Length} cameras");
+    }
+
+    void OnDestroy()
+    {
+        foreach (var kv in rts)
+        {
+            kv.Value.Release();
+            Destroy(kv.Value);
+        }
+        rts.Clear();
+
+        if (readTex != null)
+            Destroy(readTex);
+
+        if (isCapturing)
+            Time.captureFramerate = 0;
     }
 
     // ---------------- Structure to save metadata ----------------
