@@ -3,7 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
+#if UNITY_6000_0_OR_NEWER
+using UnityEditor.PackageManager;
+using UnityEditor.PackageManager.Requests;
+#endif
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEngine;
@@ -15,6 +20,28 @@ namespace OpenCVForUnity.Editor
         // Constants
         private static readonly string SYMBOL_OPENCV_DONT_USE_UNSAFE_CODE = "OPENCV_DONT_USE_UNSAFE_CODE";
 
+#if UNITY_6000_0_OR_NEWER
+        private const string SENTIS_PACKAGE_NAME = "com.unity.ai.inference";
+
+        private const string SENTIS_PACKAGE_JSON_ASSET_PATH = "Packages/com.unity.ai.inference/package.json";
+
+        private const string NEWTONSOFT_PACKAGE_NAME = "com.unity.nuget.newtonsoft-json";
+
+        private const string NEWTONSOFT_PACKAGE_JSON_ASSET_PATH = "Packages/com.unity.nuget.newtonsoft-json/package.json";
+
+        private const string SentisJsonAssemblyName = "EnoxSoftware.OpenCVForUnity.Editor.Json";
+
+        private const string SentisAsmdefOperationsTypeName = "OpenCVForUnity.Editor.OpenCVForUnitySentisAsmdefOperations";
+
+        private const string SessionKeyPendingSentisAfterNewtonsoft = "OpenCVForUnity.PendingSentisAfterNewtonsoft";
+
+        private const string SessionKeyPendingSentisEnable = "OpenCVForUnity.PendingSentisEnable";
+
+        private static bool _sentisPackageAddRequestPending;
+
+        private static bool _newtonsoftPackageAddRequestPending;
+
+#endif
         // Private Fields
         private static int _pluginFileIndex = 0;
         private static int _pluginFileCount = 0;
@@ -24,13 +51,11 @@ namespace OpenCVForUnity.Editor
         {
             try
             {
-                string[] guids = UnityEditor.AssetDatabase.FindAssets("OpenCVForUnityMenuItem");
-                if (guids.Length == 0)
+                if (!TryGetOpenCVForUnityFolderPath(out string opencvForUnityFolderPath))
                 {
                     Debug.LogWarning("SetPluginImportSettings Failed : OpenCVForUnityMenuItem.cs is missing.");
                     return;
                 }
-                string opencvForUnityFolderPath = AssetDatabase.GUIDToAssetPath(guids[0]).Substring(0, AssetDatabase.GUIDToAssetPath(guids[0]).LastIndexOf("/Editor/OpenCVForUnityMenuItem.cs"));
 
                 string pluginsFolderPath = opencvForUnityFolderPath + "/Plugins";
                 //Debug.Log("pluginsFolderPath " + pluginsFolderPath);
@@ -340,9 +365,13 @@ new Dictionary<BuildTarget, Dictionary<string, string>>() { {
             SetPlugins(GetPluginFilePaths(pluginsFolderPath + "/WebGL/2022.2"), null, null, displayProgressBar);
             SetPlugins(GetPluginFilePaths(pluginsFolderPath + "/WebGL/2023.2/wasm2023"), null, null, displayProgressBar);
             SetPlugins(GetPluginFilePaths(pluginsFolderPath + "/WebGL/2023.2/wasmMVP"), null, null, displayProgressBar);
+            SetPlugins(GetPluginFilePaths(pluginsFolderPath + "/WebGL/6000.5/wasm2023"), null, null, displayProgressBar);
+            SetPlugins(GetPluginFilePaths(pluginsFolderPath + "/WebGL/6000.5/wasmMVP"), null, null, displayProgressBar);
 
             string version = "2021.2";
-#if UNITY_2023_2_OR_NEWER
+#if UNITY_6000_5_OR_NEWER
+            version = "6000.5";
+#elif UNITY_2023_2_OR_NEWER
             version = "2023.2";
 #elif UNITY_2022_2_OR_NEWER
             version = "2022.2";
@@ -368,9 +397,16 @@ new Dictionary<BuildTarget, Dictionary<string, string>>() { {
             target = "wasmMVP";
 #endif
 
+            string WebGLPluginFilePath(string fileName)
+            {
+                if (string.IsNullOrEmpty(target))
+                    return pluginsFolderPath + "/WebGL/" + version + "/" + fileName;
+                return pluginsFolderPath + "/WebGL/" + version + "/" + target + "/" + fileName;
+            }
+
             if (threads && simd)
             {
-                SetPlugins(new string[] { pluginsFolderPath + "/WebGL/" + version + "/" + target + "/opencvforunity_simd_threads.bc" }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
+                SetPlugins(new string[] { WebGLPluginFilePath("opencvforunity_simd_threads.a") }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
                                             BuildTarget.WebGL,
                                             null
                                         }
@@ -378,7 +414,7 @@ new Dictionary<BuildTarget, Dictionary<string, string>>() { {
             }
             else if (threads)
             {
-                SetPlugins(new string[] { pluginsFolderPath + "/WebGL/" + version + "/" + target + "/opencvforunity_threads.bc" }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
+                SetPlugins(new string[] { WebGLPluginFilePath("opencvforunity_threads.a") }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
                                             BuildTarget.WebGL,
                                             null
                                         }
@@ -386,7 +422,7 @@ new Dictionary<BuildTarget, Dictionary<string, string>>() { {
             }
             else if (simd)
             {
-                SetPlugins(new string[] { pluginsFolderPath + "/WebGL/" + version + "/" + target + "/opencvforunity_simd.bc" }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
+                SetPlugins(new string[] { WebGLPluginFilePath("opencvforunity_simd.a") }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
                                             BuildTarget.WebGL,
                                             null
                                         }
@@ -394,7 +430,7 @@ new Dictionary<BuildTarget, Dictionary<string, string>>() { {
             }
             else
             {
-                SetPlugins(new string[] { pluginsFolderPath + "/WebGL/" + version + "/" + target + "/opencvforunity.bc" }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
+                SetPlugins(new string[] { WebGLPluginFilePath("opencvforunity.a") }, null, new Dictionary<BuildTarget, Dictionary<string, string>>() { {
                                             BuildTarget.WebGL,
                                             null
                                         }
@@ -405,6 +441,274 @@ new Dictionary<BuildTarget, Dictionary<string, string>>() { {
                 PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
         }
 
+#if UNITY_6000_0_OR_NEWER
+        /// <summary>
+        /// Verifies the main and Editor asmdefs include the Unity Sentis assembly reference and matching versionDefines.
+        /// The Example asmdef is not validated when its file is missing (e.g. the user removed the Examples folder); when the file exists, it is validated the same way as the main asmdef.
+        /// </summary>
+        public static bool ValidateSentisAsmdefIntegration()
+        {
+            if (!TryGetOpenCVForUnityFolderPath(out string root))
+            {
+                return false;
+            }
+
+            return TryInvokeValidateSentisAsmdefIntegration(root);
+        }
+
+        /// <summary>
+        /// Returns whether the Unity Sentis package (com.unity.ai.inference) is present in the project.
+        /// </summary>
+        public static bool IsSentisPackageInstalled()
+        {
+            return UnityEditor.PackageManager.PackageInfo.FindForAssetPath(SENTIS_PACKAGE_JSON_ASSET_PATH) != null;
+        }
+
+        /// <summary>
+        /// Returns whether the Newtonsoft.Json UPM package is present in the project.
+        /// </summary>
+        public static bool IsNewtonsoftJsonPackageInstalled()
+        {
+            return UnityEditor.PackageManager.PackageInfo.FindForAssetPath(NEWTONSOFT_PACKAGE_JSON_ASSET_PATH) != null;
+        }
+
+        private static Type GetSentisAsmdefOperationsType()
+        {
+            Type t = Type.GetType($"{SentisAsmdefOperationsTypeName}, {SentisJsonAssemblyName}");
+            if (t != null)
+            {
+                return t;
+            }
+
+            foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (asm.GetName().Name == SentisJsonAssemblyName)
+                {
+                    return asm.GetType(SentisAsmdefOperationsTypeName);
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TryInvokeValidateSentisAsmdefIntegration(string openCvForUnityRoot)
+        {
+            Type t = GetSentisAsmdefOperationsType();
+            if (t == null)
+            {
+                return false;
+            }
+
+            MethodInfo m = t.GetMethod("ValidateSentisAsmdefIntegration", BindingFlags.Public | BindingFlags.Static);
+            if (m == null)
+            {
+                return false;
+            }
+
+            return (bool)m.Invoke(null, new object[] { openCvForUnityRoot });
+        }
+
+        private static bool TryInvokeApplySentisAsmdefIntegration(string openCvForUnityRoot, bool enable)
+        {
+            Type t = GetSentisAsmdefOperationsType();
+            if (t == null)
+            {
+                Debug.LogError(
+                    $"OpenCV for Unity: JSON asmdef helper is not loaded. Install UPM package {NEWTONSOFT_PACKAGE_NAME} (Newtonsoft.Json) and ensure it resolves.");
+                EditorUtility.DisplayDialog(
+                    "Error",
+                    $"The Newtonsoft.Json helper assembly is unavailable. Add package {NEWTONSOFT_PACKAGE_NAME} via Package Manager, wait for recompilation, then retry.",
+                    "OK");
+                return false;
+            }
+
+            MethodInfo m = t.GetMethod("ApplySentisAsmdefIntegration", BindingFlags.Public | BindingFlags.Static);
+            if (m == null)
+            {
+                Debug.LogError("OpenCV for Unity: ApplySentisAsmdefIntegration was not found on the JSON helper type.");
+                return false;
+            }
+
+            m.Invoke(null, new object[] { openCvForUnityRoot, enable });
+            return true;
+        }
+
+        private static void ContinueSetSentisAsmdefIntegrationAfterNewtonsoft(bool enable, string root)
+        {
+            if (!enable)
+            {
+                TryInvokeApplySentisAsmdefIntegration(root, false);
+                return;
+            }
+
+            if (IsSentisPackageInstalled())
+            {
+                TryInvokeApplySentisAsmdefIntegration(root, true);
+                return;
+            }
+
+            StartAddSentisPackageThenApplyAsmdef(root);
+        }
+
+        /// <summary>
+        /// After adding <c>com.unity.nuget.newtonsoft-json</c>, resumes Enable/Disable Sentis asmdef flow once the JSON helper assembly is compiled.
+        /// </summary>
+        internal static void TryResumePendingSentisIntegrationAfterNewtonsoft()
+        {
+            if (!SessionState.GetBool(SessionKeyPendingSentisAfterNewtonsoft, false))
+            {
+                return;
+            }
+
+            if (GetSentisAsmdefOperationsType() == null)
+            {
+                EditorApplication.delayCall += TryResumePendingSentisIntegrationAfterNewtonsoft;
+                return;
+            }
+
+            bool enable = SessionState.GetInt(SessionKeyPendingSentisEnable, 0) != 0;
+            SessionState.EraseBool(SessionKeyPendingSentisAfterNewtonsoft);
+            SessionState.EraseInt(SessionKeyPendingSentisEnable);
+
+            if (!TryGetOpenCVForUnityFolderPath(out string root))
+            {
+                EditorUtility.DisplayDialog("Error", "Could not locate OpenCV for Unity folder.", "OK");
+                return;
+            }
+
+            ContinueSetSentisAsmdefIntegrationAfterNewtonsoft(enable, root);
+        }
+
+        private static void FinishPackageManagerAddProgress(int progressId, bool succeeded)
+        {
+            Progress.Finish(progressId, succeeded ? Progress.Status.Succeeded : Progress.Status.Failed);
+        }
+
+        private static void DisplayPackageAddErrorDialogAfterProgress(string packageName, string errorMessage)
+        {
+            EditorApplication.delayCall += () =>
+            {
+                EditorUtility.DisplayDialog("Error", $"Failed to add package {packageName}: {errorMessage}", "OK");
+            };
+        }
+
+        private static void StartAddNewtonsoftPackageThenContinueSentisFlow(bool enable)
+        {
+            if (_newtonsoftPackageAddRequestPending)
+            {
+                EditorUtility.DisplayDialog("OpenCV for Unity", "A package add request is already in progress.", "OK");
+                return;
+            }
+
+            _newtonsoftPackageAddRequestPending = true;
+            var addRequest = Client.Add(NEWTONSOFT_PACKAGE_NAME);
+            string progressDescription = $"Adding package {NEWTONSOFT_PACKAGE_NAME} via Package Manager…";
+            int progressId = Progress.Start("OpenCV for Unity", progressDescription, Progress.Options.Sticky);
+
+            EditorApplication.CallbackFunction handler = null;
+            handler = () =>
+            {
+                if (!addRequest.IsCompleted)
+                {
+                    Progress.Report(progressId, -1f, progressDescription);
+                    return;
+                }
+
+                EditorApplication.update -= handler;
+                _newtonsoftPackageAddRequestPending = false;
+
+                if (addRequest.Status != StatusCode.Success)
+                {
+                    string err = addRequest.Error != null ? addRequest.Error.message : addRequest.Status.ToString();
+                    Debug.LogError($"Failed to add {NEWTONSOFT_PACKAGE_NAME}: {err}");
+                    FinishPackageManagerAddProgress(progressId, false);
+                    DisplayPackageAddErrorDialogAfterProgress(NEWTONSOFT_PACKAGE_NAME, err);
+                    return;
+                }
+
+                FinishPackageManagerAddProgress(progressId, true);
+                SessionState.SetBool(SessionKeyPendingSentisAfterNewtonsoft, true);
+                SessionState.SetInt(SessionKeyPendingSentisEnable, enable ? 1 : 0);
+                EditorApplication.delayCall += TryResumePendingSentisIntegrationAfterNewtonsoft;
+            };
+            EditorApplication.update += handler;
+        }
+
+        private static void StartAddSentisPackageThenApplyAsmdef(string root)
+        {
+            if (_sentisPackageAddRequestPending)
+            {
+                EditorUtility.DisplayDialog("Unity Sentis", "A package add request is already in progress.", "OK");
+                return;
+            }
+
+            _sentisPackageAddRequestPending = true;
+            var addRequest = Client.Add(SENTIS_PACKAGE_NAME);
+            string progressDescription = $"Adding package {SENTIS_PACKAGE_NAME} via Package Manager…";
+            int progressId = Progress.Start("OpenCV for Unity", progressDescription, Progress.Options.Sticky);
+
+            EditorApplication.CallbackFunction handler = null;
+            handler = () =>
+            {
+                if (!addRequest.IsCompleted)
+                {
+                    Progress.Report(progressId, -1f, progressDescription);
+                    return;
+                }
+
+                EditorApplication.update -= handler;
+                _sentisPackageAddRequestPending = false;
+
+                if (addRequest.Status == StatusCode.Success)
+                {
+                    FinishPackageManagerAddProgress(progressId, true);
+                    TryInvokeApplySentisAsmdefIntegration(root, true);
+                    return;
+                }
+
+                string err = addRequest.Error != null ? addRequest.Error.message : addRequest.Status.ToString();
+                Debug.LogError($"Failed to add {SENTIS_PACKAGE_NAME}: {err}");
+                FinishPackageManagerAddProgress(progressId, false);
+                DisplayPackageAddErrorDialogAfterProgress(SENTIS_PACKAGE_NAME, err);
+            };
+            EditorApplication.update += handler;
+        }
+
+        /// <summary>
+        /// Always updates the main and Editor asmdefs. Updates the Example asmdef only if that file exists, adding or removing the Unity Sentis (assembly <c>Unity.InferenceEngine</c>) reference and versionDefines.
+        /// When enabling, installs <c>com.unity.ai.inference</c> via the Package Manager if it is not already present, then updates asmdefs.
+        /// Requires <c>com.unity.nuget.newtonsoft-json</c> for asmdef JSON editing; it is added automatically if missing.
+        /// </summary>
+        public static void SetSentisAsmdefIntegration(bool enable)
+        {
+            string title = enable
+                ? "Enable Sentis inference in Dnn Examples"
+                : "Disable Sentis inference in Dnn Examples";
+            string message = enable
+                ? "This enables Unity Sentis (com.unity.ai.inference) inference in OpenCV for Unity Dnn module example scenes. If the package is not in the project, it will be imported via the Package Manager. OpenCV for Unity asmdef files will be updated to reference \"Unity.InferenceEngine\" and add versionDefines for com.unity.ai.inference. Continue?"
+                : "This disables Unity Sentis inference for OpenCV for Unity Dnn module example scenes. The \"Unity.InferenceEngine\" assembly reference and com.unity.ai.inference versionDefines will be removed from OpenCV for Unity asmdef files. Continue?";
+
+            if (!EditorUtility.DisplayDialog(title, message, "Yes", "Cancel"))
+            {
+                return;
+            }
+
+            if (!TryGetOpenCVForUnityFolderPath(out string root))
+            {
+                EditorUtility.DisplayDialog("Error", "Could not locate OpenCV for Unity folder.", "OK");
+                return;
+            }
+
+            if (!IsNewtonsoftJsonPackageInstalled())
+            {
+                StartAddNewtonsoftPackageThenContinueSentisFlow(enable);
+                return;
+            }
+
+            ContinueSetSentisAsmdefIntegrationAfterNewtonsoft(enable, root);
+        }
+
+#endif
         public static bool ValidateUseUnsafeCode()
         {
             return !EditorUserBuildSettings.activeScriptCompilationDefines.Contains(SYMBOL_OPENCV_DONT_USE_UNSAFE_CODE);
@@ -643,6 +947,37 @@ new Dictionary<BuildTarget, Dictionary<string, string>>() { {
             }
         }
 
+        private static bool TryGetOpenCVForUnityFolderPath(out string folderPath)
+        {
+            folderPath = null;
+            string[] guids = AssetDatabase.FindAssets("OpenCVForUnityMenuItem");
+            if (guids.Length == 0)
+            {
+                return false;
+            }
+
+            string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+            int idx = path.LastIndexOf("/Editor/OpenCVForUnityMenuItem.cs", StringComparison.Ordinal);
+            if (idx < 0)
+            {
+                return false;
+            }
+
+            folderPath = path.Substring(0, idx);
+            return true;
+        }
+
+#if UNITY_6000_0_OR_NEWER
+        [InitializeOnLoad]
+        private static class OpenCVForUnitySentisNewtonsoftResumeHook
+        {
+            static OpenCVForUnitySentisNewtonsoftResumeHook()
+            {
+                EditorApplication.delayCall += TryResumePendingSentisIntegrationAfterNewtonsoft;
+            }
+        }
+
+#endif
         private static class Symbol
         {
             public static IEnumerable<string> GetCurrentSymbols(NamedBuildTarget nameBuildTarget)

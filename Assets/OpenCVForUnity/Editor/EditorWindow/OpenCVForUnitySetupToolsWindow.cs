@@ -36,6 +36,32 @@ namespace OpenCVForUnity.Editor
 
                 EditorGUILayout.LabelField("[Setup for Example Scenes]", customStyle);
 
+#if UNITY_6000_0_OR_NEWER
+                GUILayout.BeginVertical("box");
+                {
+                    if (OpenCVForUnityMenuItem.IsSentisPackageInstalled()
+                        && OpenCVForUnityMenuItem.ValidateSentisAsmdefIntegration())
+                    {
+                        string aboutText = "Disable Unity Sentis (com.unity.ai.inference) inference for OpenCV for Unity Dnn module example scenes. ";
+                        EditorGUILayout.LabelField(aboutText, EditorStyles.wordWrappedLabel);
+                        if (GUILayout.Button("Disable Unity Sentis Integration"))
+                        {
+                            OpenCVForUnityMenuItem.SetSentisAsmdefIntegration(false);
+                        }
+                    }
+                    else
+                    {
+                        string aboutText = "Enable Unity Sentis (com.unity.ai.inference) inference in OpenCV for Unity Dnn module example scenes.";
+                        EditorGUILayout.LabelField(aboutText, EditorStyles.wordWrappedLabel);
+                        if (GUILayout.Button("Enable Unity Sentis Integration"))
+                        {
+                            OpenCVForUnityMenuItem.SetSentisAsmdefIntegration(true);
+                        }
+                    }
+                }
+                GUILayout.EndVertical();
+
+#endif
                 GUILayout.BeginVertical("box");
                 {
                     string aboutText = "Automatically downloads the files needed to run Example Scenes. After downloading, please run \"Move StreamingAssets Folder\".";

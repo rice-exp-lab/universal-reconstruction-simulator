@@ -106,6 +106,6 @@ AssetOrigin:
   serializedVersion: 1
   productId: 21088
   packageName: OpenCV for Unity
-  packageVersion: 3.0.2
+  packageVersion: 3.0.3
   assetPath: Assets/OpenCVForUnity/Editor/EditorWindow/EditorWindowIcon.png
-  uploadId: 846054
+  uploadId: 929448

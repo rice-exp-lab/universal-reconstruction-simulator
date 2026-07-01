@@ -113,16 +113,15 @@ namespace OpenCVForUnity.UnityIntegration.Helper.Source2Mat
 
                     _currentSource2MatHelperClassInterfaces = ClassNameToClassInterfaces(_requestedSource2MatHelperClassName);
 
-                    bool autoPlay = true;
                     if (_source2MatHelper != null)
                     {
-                        autoPlay = _source2MatHelper.IsInitialized() ? _source2MatHelper.IsPlaying() : autoPlayAfterInitialize;
+                        bool autoPlay = _source2MatHelper.IsInitialized() ? _source2MatHelper.IsPlaying() : autoPlayAfterInitialize;
                         _source2MatHelper.Dispose();
                         Destroy(_source2MatHelper as Component);
                         _source2MatHelper = null;
-                    }
 
-                    Initialize(autoPlay);
+                        Initialize(autoPlay);
+                    }
                 }
             }
         }

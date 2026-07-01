@@ -32,6 +32,87 @@ Error: 1.00 millimeters
 
 
 
+-----------------------------------------------------------------------
+prueba en unity:
+RMS cam1: 0.3186  |  RMS cam2: 0.2913
+UnityEngine.Debug:Log (object)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:304)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+Stereo RMS: 0.3405
+UnityEngine.Debug:Log (object)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:320)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+Stereo Calibration OK
+UnityEngine.Debug:Log (object)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:324)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+K1:
+[989.6833353973917, 0, 961.5637559781104;
+ 0, 989.9896152593788, 557.0719085658941;
+ 0, 0, 1]
+UnityEngine.Debug:Log (object)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:325)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+K2:
+[994.1524624739694, 0, 965.5161547163983;
+ 0, 995.0895139618503, 549.1583185652264;
+ 0, 0, 1]
+UnityEngine.Debug:Log (object)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:326)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+R:
+[0.6061469376930261, 0.01358048648158248, -0.7952367322453675;
+ -0.007778855319614891, 0.999907618258139, 0.01114649537983028;
+ 0.7953146417206736, -0.0005703825555135496, 0.6061965814226085]
+UnityEngine.Debug:Log (object)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:327)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+T:
+[1.397177222035856;
+ -0.005478538021463355;
+ 0.7084162259364524]
+UnityEngine.Debug:Log (object)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:328)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+Rotation UNITY:X: [0.6156613826751709, 0, -0.7880109548568726;
+ 0, 1, 0;
+ 0.7880109548568726, 0, 0.6156613826751709]
+UnityEngine.Debug:Log (object)
+stereoCalib:compareCalibration (OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat) (at Assets/Scripts/stereoCalib.cs:362)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:329)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+Rotation error: 1.0367 degrees
+UnityEngine.Debug:Log (object)
+stereoCalib:compareCalibration (OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat) (at Assets/Scripts/stereoCalib.cs:378)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:329)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+Position Unity: X:1.348, Y:0.000, Z:0.658
+UnityEngine.Debug:Log (object)
+stereoCalib:compareCalibration (OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat) (at Assets/Scripts/stereoCalib.cs:390)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:329)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+Distance error: 70.83 millimeters
+UnityEngine.Debug:Log (object)
+stereoCalib:compareCalibration (OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat) (at Assets/Scripts/stereoCalib.cs:399)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:329)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
+Sampson RMS: 0.2736 px
+UnityEngine.Debug:Log (object)
+stereoCalib:compareCalibration (OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat,OpenCVForUnity.CoreModule.Mat) (at Assets/Scripts/stereoCalib.cs:402)
+stereoCalib:RunCalibration () (at Assets/Scripts/stereoCalib.cs:329)
+stereoCalib:Update () (at Assets/Scripts/stereoCalib.cs:113)
+
 
 
 

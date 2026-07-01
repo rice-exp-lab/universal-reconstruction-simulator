@@ -96,7 +96,9 @@ namespace OpenCVForUnity.UnityIntegration
             // Get all EventSystems in the active scene
             EventSystem[] eventSystems;
 
-#if UNITY_2023_1_OR_NEWER
+#if UNITY_6000_4_OR_NEWER
+            eventSystems = UnityEngine.Object.FindObjectsByType<EventSystem>();
+#elif UNITY_2023_1_OR_NEWER
             eventSystems = UnityEngine.Object.FindObjectsByType<EventSystem>(FindObjectsSortMode.None);
 #else
             eventSystems = UnityEngine.Object.FindObjectsOfType<EventSystem>();

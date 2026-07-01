@@ -103,7 +103,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        Task ExecuteAsync(CancellationToken cancellationToken = default);
+        Task ExecuteTaskAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Executes processing asynchronously using single input Mat.
@@ -111,7 +111,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <param name="input">The input Mat.</param>
         /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        Task ExecuteAsync(Mat input, CancellationToken cancellationToken = default);
+        Task ExecuteTaskAsync(Mat input, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Executes processing asynchronously using multiple input Mats (optimized for 2 inputs).
@@ -120,7 +120,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <param name="input2">The second input Mat.</param>
         /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        Task ExecuteAsync(Mat input1, Mat input2, CancellationToken cancellationToken = default);
+        Task ExecuteTaskAsync(Mat input1, Mat input2, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Executes processing asynchronously using multiple input Mats (optimized for 3 inputs).
@@ -130,7 +130,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <param name="input3">The third input Mat.</param>
         /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        Task ExecuteAsync(Mat input1, Mat input2, Mat input3, CancellationToken cancellationToken = default);
+        Task ExecuteTaskAsync(Mat input1, Mat input2, Mat input3, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Executes processing asynchronously using multiple input Mats.
@@ -138,6 +138,68 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <param name="inputs">The input Mats.</param>
         /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+        Task ExecuteTaskAsync(Mat[] inputs, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Executes processing asynchronously with pre-set inputs.
+        /// </summary>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        Task ExecuteAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Executes processing asynchronously using single input Mat.
+        /// </summary>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat, CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        /// <param name="input">The input Mat.</param>
+        /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        Task ExecuteAsync(Mat input, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Executes processing asynchronously using multiple input Mats (optimized for 2 inputs).
+        /// </summary>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat, Mat, CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        /// <param name="input1">The first input Mat.</param>
+        /// <param name="input2">The second input Mat.</param>
+        /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        Task ExecuteAsync(Mat input1, Mat input2, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Executes processing asynchronously using multiple input Mats (optimized for 3 inputs).
+        /// </summary>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat, Mat, Mat, CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        /// <param name="input1">The first input Mat.</param>
+        /// <param name="input2">The second input Mat.</param>
+        /// <param name="input3">The third input Mat.</param>
+        /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        Task ExecuteAsync(Mat input1, Mat input2, Mat input3, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Executes processing asynchronously using multiple input Mats.
+        /// </summary>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat[], CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        /// <param name="inputs">The input Mats.</param>
+        /// <param name="cancellationToken">Optional cancellation token to cancel the operation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
         Task ExecuteAsync(Mat[] inputs, CancellationToken cancellationToken = default);
 
         /// <summary>

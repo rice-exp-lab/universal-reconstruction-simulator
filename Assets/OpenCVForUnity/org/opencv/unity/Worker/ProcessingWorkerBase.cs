@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenCVForUnity.CoreModule;
@@ -16,7 +17,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
     /// IMPORTANT:
     /// 1. Execution Modes:
     ///    - Synchronous: Execute() - Blocks until completion
-    ///    - Asynchronous: ExecuteAsync() - Returns immediately, runs in background
+    ///    - Asynchronous: ExecuteTaskAsync() - Returns immediately, runs in background
     ///    - Only one operation (sync or async) can run at a time
     ///
     /// 2. Accessing Results:
@@ -30,9 +31,9 @@ namespace OpenCVForUnity.UnityIntegration.Worker
     ///      - Required when storing results or sharing across threads
     ///
     /// 3. Resource Management:
-    ///    - Implements IDisposable for proper cleanup
-    ///    - Dispose() safely cancels running operations
-    ///    - Waits for completion with timeout (500ms)
+    ///    - Implements IDisposable and IAsyncDisposable for proper cleanup
+    ///    - Dispose() / DisposeAsync() safely cancels running operations
+    ///    - Waits for completion with a default timeout when disposing
     ///    - Automatically cleans up internal buffers
     ///
     /// 4. Thread Safety:
@@ -44,6 +45,24 @@ namespace OpenCVForUnity.UnityIntegration.Worker
     /// ```csharp
     /// using (var worker = new ConcreteWorker())
     /// {
+    ///     void OnCompleted(ProcessingCompletion completion)
+    ///     {
+    ///         switch (completion.Kind)
+    ///         {
+    ///             case ProcessingCompletionKind.Succeeded:
+    ///                 break;
+    ///             case ProcessingCompletionKind.Canceled:
+    ///                 break;
+    ///             case ProcessingCompletionKind.Faulted:
+    ///                 if (completion.Error != null)
+    ///                     Debug.LogException(completion.Error);
+    ///                 break;
+    ///         }
+    ///     }
+    ///
+    ///     worker.ProcessingCompleted += OnCompleted;
+    ///
+    ///     // ProcessingCompleted is raised when each Execute / ExecuteTaskAsync finishes (handler: ProcessingCompletion only).
     ///     // Synchronous execution
     ///     worker.Execute(input);
     ///     using (var result = worker.PeekOutput())
@@ -57,15 +76,17 @@ namespace OpenCVForUnity.UnityIntegration.Worker
     ///     }
     ///
     ///     // Asynchronous execution
-    ///     await worker.ExecuteAsync(input);
+    ///     await worker.ExecuteTaskAsync(input);
     ///     using (var result = worker.CopyOutput())
     ///     {
     ///         // Process result safely
     ///     }
+    ///
+    ///     worker.ProcessingCompleted -= OnCompleted;
     /// }
     /// ```
     /// </remarks>
-    public abstract class ProcessingWorkerBase : IProcessingWorker
+    public abstract class ProcessingWorkerBase : IProcessingWorker, IAsyncDisposable
     {
         /// <summary>
         /// Lock object for thread synchronization.
@@ -82,46 +103,68 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         protected CancellationTokenSource _cts;
         protected TaskCompletionSource<bool> _executionCompletion;
 
+        /// <summary>Maximum time <see cref="Dispose"/> and <see cref="DisposeAsync"/> allow for an in-progress operation to finish before continuing cleanup and logging a timeout.</summary>
+        private static readonly TimeSpan DefaultDisposeOperationWaitTimeout = TimeSpan.FromMilliseconds(500);
+
+        /// <summary>
+        /// Completion status for <see cref="ProcessingCompleted"/>.
+        /// </summary>
+        public enum ProcessingCompletionKind
+        {
+            Succeeded,
+            Canceled,
+            Faulted
+        }
+
         /// <summary>
         /// Occurs when a processing operation completes.
         /// </summary>
         /// <remarks>
-        /// This event is raised after the processing operation completes, regardless of whether it succeeded or failed.
+        /// This event is raised after the processing operation completes (success, cancellation, or fault).
         /// The event is raised on the thread that completed the operation.
+        /// Handlers receive only the <see cref="ProcessingCompletion"/> value (no sender argument).
+        /// <see cref="ProcessingCompletion.Kind"/> uses the nested <see cref="ProcessingCompletionKind"/> on this class (same member names as <see cref="OpenCVForUnity.UnityIntegration.Runner.WorkCompletionKind"/> in the Runner namespace, but a distinct CLR type). Cancellation is reported when the
         /// </remarks>
-        public event EventHandler<ProcessingCompletion> ProcessingCompleted;
+        public event Action<ProcessingCompletion> ProcessingCompleted;
 
         /// <summary>
-        /// Represents the completion status of a processing operation.
+        /// Payload for <see cref="ProcessingCompleted"/>; same Kind / Error shape as <see cref="WorkCompletion{TResult}"/> without a results buffer (use <see cref="PeekOutput"/> / <see cref="CopyOutput"/> after success).
         /// </summary>
         public readonly struct ProcessingCompletion
         {
             /// <summary>
-            /// Gets a value indicating whether the processing operation completed successfully.
+            /// Gets the completion status of the processing operation.
             /// </summary>
-            public bool IsSuccess { get; }
+            public ProcessingCompletionKind Kind { get; }
 
             /// <summary>
-            /// Gets the exception that occurred during the processing operation, if any.
+            /// Gets the exception for <see cref="ProcessingCompletionKind.Canceled"/> or <see cref="ProcessingCompletionKind.Faulted"/>, if any.
             /// </summary>
             public Exception Error { get; }
 
-            private ProcessingCompletion(bool isSuccess, Exception error)
+            private ProcessingCompletion(ProcessingCompletionKind kind, Exception error)
             {
-                IsSuccess = isSuccess;
+                Kind = kind;
                 Error = error;
             }
 
             /// <summary>
-            /// Creates a successful completion status.
+            /// Successful completion.
             /// </summary>
-            public static ProcessingCompletion Success() => new ProcessingCompletion(true, null);
+            public static ProcessingCompletion ForSucceeded() =>
+                new ProcessingCompletion(ProcessingCompletionKind.Succeeded, null);
 
             /// <summary>
-            /// Creates a failed completion status with the specified error.
+            /// Canceled completion (e.g. <see cref="OperationCanceledException"/> from the async path).
             /// </summary>
-            /// <param name="error">The exception that occurred.</param>
-            public static ProcessingCompletion Failure(Exception error) => new ProcessingCompletion(false, error);
+            public static ProcessingCompletion ForCanceled(Exception error) =>
+                new ProcessingCompletion(ProcessingCompletionKind.Canceled, error);
+
+            /// <summary>
+            /// Failed completion.
+            /// </summary>
+            public static ProcessingCompletion ForFaulted(Exception error) =>
+                new ProcessingCompletion(ProcessingCompletionKind.Faulted, error);
         }
 
         /// <summary>
@@ -130,7 +173,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <remarks>
         /// This property is thread-safe and can be safely accessed from any thread.
         /// The value is guaranteed to be consistent with the actual execution state.
-        /// Use this property to check operation status before calling ExecuteAsync
+        /// Use this property to check operation status before calling ExecuteTaskAsync
         /// or before accessing results.
         /// </remarks>
         public bool IsRunning
@@ -201,7 +244,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
 
             lock (_lockObject)
             {
-                EnsureInputsCapacity(2);
+                Array.Resize(ref _inputs, 2);
                 _inputs[0] = input1;
                 _inputs[1] = input2;
             }
@@ -226,7 +269,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
 
             lock (_lockObject)
             {
-                EnsureInputsCapacity(3);
+                Array.Resize(ref _inputs, 3);
                 _inputs[0] = input1;
                 _inputs[1] = input2;
                 _inputs[2] = input3;
@@ -254,7 +297,9 @@ namespace OpenCVForUnity.UnityIntegration.Worker
             {
                 if (inputs != null)
                 {
-                    EnsureInputsCapacity(inputs.Length);
+                    // Shrink as well as grow: otherwise a shorter call leaves stale Mat refs in the tail,
+                    // and RunCoreProcessing may iterate _inputs.Length and hit disposed objects.
+                    Array.Resize(ref _inputs, inputs.Length);
                     Array.Copy(inputs, _inputs, inputs.Length);
                 }
                 else
@@ -274,11 +319,11 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// 1. The returned Mat is a REFERENCE (submat) to the internal buffer:
         ///    - Any modifications to the returned Mat will affect future results
         ///    - Disposing the returned Mat is safe and does not dispose the internal buffer itself; only the submat handle becomes invalid
-        ///    - The reference becomes invalid after the next Execute/ExecuteAsync call
+        ///    - The reference becomes invalid after the next Execute/ExecuteTaskAsync call
         ///    - The reference becomes invalid if the worker is disposed
         ///
         /// 2. Thread Safety Considerations:
-        ///    - DO NOT use with ExecuteAsync() as the internal buffer may be modified during async operation
+        ///    - DO NOT use with ExecuteTaskAsync() as the internal buffer may be modified during async operation
         ///    - Even with Execute(), the returned reference is only valid until the next execution
         ///    - For thread-safe access to results, always use CopyOutput() instead
         ///
@@ -314,7 +359,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// </summary>
         /// <remarks>
         /// This method is thread-safe and can be safely used with both synchronous and asynchronous execution.
-        /// When working with ExecuteAsync(), always use this method instead of PeekOutput()
+        /// When working with ExecuteTaskAsync(), always use this method instead of PeekOutput()
         /// to ensure thread safety and data consistency.
         /// </remarks>
         /// <param name="index">The output index.</param>
@@ -337,7 +382,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// </summary>
         /// <remarks>
         /// This method is thread-safe and can be safely used with both synchronous and asynchronous execution.
-        /// When working with ExecuteAsync(), always use this method instead of PeekOutput()
+        /// When working with ExecuteTaskAsync(), always use this method instead of PeekOutput()
         /// to ensure thread safety and data consistency.
         ///
         /// The destination Mat will be automatically resized if its dimensions
@@ -393,6 +438,17 @@ namespace OpenCVForUnity.UnityIntegration.Worker
                     throw new InvalidOperationException("Another processing operation is already running.");
 
                 _isRunning = true;
+                TaskCompletionSource<bool> completionSource;
+                try
+                {
+                    completionSource = new TaskCompletionSource<bool>();
+                    _executionCompletion = completionSource;
+                }
+                catch
+                {
+                    _isRunning = false;
+                    throw;
+                }
                 try
                 {
                     if (_outputs != null)
@@ -412,6 +468,8 @@ namespace OpenCVForUnity.UnityIntegration.Worker
                 finally
                 {
                     _isRunning = false;
+                    completionSource.TrySetResult(true);
+                    _executionCompletion = null;
                 }
             }
         }
@@ -519,7 +577,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <exception cref="ObjectDisposedException">Thrown when the worker has been disposed.</exception>
         /// <exception cref="InvalidOperationException">Thrown when another processing operation is already running.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-        public virtual async Task ExecuteAsync(CancellationToken cancellationToken = default)
+        public virtual async Task ExecuteTaskAsync(CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
 
@@ -536,7 +594,8 @@ namespace OpenCVForUnity.UnityIntegration.Worker
                 {
                     // Create new CancellationTokenSource
                     cts = new CancellationTokenSource();
-                    var previousCts = Interlocked.Exchange(ref _cts, cts);
+                    var previousCts = _cts;
+                    _cts = cts;
                     previousCts?.Dispose();
 
                     completionSource = new TaskCompletionSource<bool>();
@@ -551,10 +610,9 @@ namespace OpenCVForUnity.UnityIntegration.Worker
 
             try
             {
-                // Link with external cancellation token
-                using (cancellationToken.Register(() => cts.Cancel()))
+                using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cts.Token))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    linkedCts.Token.ThrowIfCancellationRequested();
 
                     Mat[] inputsSnapshot;
                     lock (_lockObject)
@@ -562,7 +620,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
                         inputsSnapshot = (Mat[])_inputs?.Clone();
                     }
 
-                    var results = await RunCoreProcessingAsync(inputsSnapshot, cts.Token);
+                    var results = await RunCoreProcessingTaskAsync(inputsSnapshot, linkedCts.Token);
 
                     lock (_lockObject)
                     {
@@ -626,10 +684,10 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <exception cref="ObjectDisposedException">Thrown when the worker has been disposed.</exception>
         /// <exception cref="InvalidOperationException">Thrown when another processing operation is already running.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-        public virtual async Task ExecuteAsync(Mat input, CancellationToken cancellationToken = default)
+        public virtual Task ExecuteTaskAsync(Mat input, CancellationToken cancellationToken = default)
         {
             SetInput(input);
-            await ExecuteAsync(cancellationToken);
+            return ExecuteTaskAsync(cancellationToken);
         }
 
         /// <summary>
@@ -659,10 +717,10 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <exception cref="ObjectDisposedException">Thrown when the worker has been disposed.</exception>
         /// <exception cref="InvalidOperationException">Thrown when another processing operation is already running.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-        public virtual async Task ExecuteAsync(Mat input1, Mat input2, CancellationToken cancellationToken = default)
+        public virtual Task ExecuteTaskAsync(Mat input1, Mat input2, CancellationToken cancellationToken = default)
         {
             SetInputs(input1, input2);
-            await ExecuteAsync(cancellationToken);
+            return ExecuteTaskAsync(cancellationToken);
         }
 
         /// <summary>
@@ -693,10 +751,10 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <exception cref="ObjectDisposedException">Thrown when the worker has been disposed.</exception>
         /// <exception cref="InvalidOperationException">Thrown when another processing operation is already running.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-        public virtual async Task ExecuteAsync(Mat input1, Mat input2, Mat input3, CancellationToken cancellationToken = default)
+        public virtual Task ExecuteTaskAsync(Mat input1, Mat input2, Mat input3, CancellationToken cancellationToken = default)
         {
             SetInputs(input1, input2, input3);
-            await ExecuteAsync(cancellationToken);
+            return ExecuteTaskAsync(cancellationToken);
         }
 
         /// <summary>
@@ -726,11 +784,51 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <exception cref="ObjectDisposedException">Thrown when the worker has been disposed.</exception>
         /// <exception cref="InvalidOperationException">Thrown when another processing operation is already running.</exception>
         /// <exception cref="OperationCanceledException">Thrown when the operation is cancelled.</exception>
-        public virtual async Task ExecuteAsync(Mat[] inputs, CancellationToken cancellationToken = default)
+        public virtual Task ExecuteTaskAsync(Mat[] inputs, CancellationToken cancellationToken = default)
         {
             SetInputs(inputs);
-            await ExecuteAsync(cancellationToken);
+            return ExecuteTaskAsync(cancellationToken);
         }
+
+        /// <inheritdoc cref="IProcessingWorker.ExecuteAsync(CancellationToken)"/>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        public virtual Task ExecuteAsync(CancellationToken cancellationToken = default) =>
+            ExecuteTaskAsync(cancellationToken);
+
+        /// <inheritdoc cref="IProcessingWorker.ExecuteAsync(Mat, CancellationToken)"/>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat, CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        public virtual Task ExecuteAsync(Mat input, CancellationToken cancellationToken = default) =>
+            ExecuteTaskAsync(input, cancellationToken);
+
+        /// <inheritdoc cref="IProcessingWorker.ExecuteAsync(Mat, Mat, CancellationToken)"/>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat, Mat, CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        public virtual Task ExecuteAsync(Mat input1, Mat input2, CancellationToken cancellationToken = default) =>
+            ExecuteTaskAsync(input1, input2, cancellationToken);
+
+        /// <inheritdoc cref="IProcessingWorker.ExecuteAsync(Mat, Mat, Mat, CancellationToken)"/>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat, Mat, Mat, CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        public virtual Task ExecuteAsync(Mat input1, Mat input2, Mat input3, CancellationToken cancellationToken = default) =>
+            ExecuteTaskAsync(input1, input2, input3, cancellationToken);
+
+        /// <inheritdoc cref="IProcessingWorker.ExecuteAsync(Mat[], CancellationToken)"/>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="ExecuteTaskAsync(Mat[], CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        [Obsolete("Use ExecuteTaskAsync(). ExecuteAsync() will return Awaitable in a future version.")]
+        public virtual Task ExecuteAsync(Mat[] inputs, CancellationToken cancellationToken = default) =>
+            ExecuteTaskAsync(inputs, cancellationToken);
 
         /// <summary>
         /// Cancels the current processing operation if running.
@@ -738,7 +836,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <remarks>
         /// This method is thread-safe and can be safely called from any thread.
         /// This method provides a convenient way to cancel the current operation without managing a CancellationToken.
-        /// It has the same effect as canceling the token passed to ExecuteAsync.
+        /// It has the same effect as canceling the token passed to ExecuteTaskAsync.
         /// </remarks>
         public virtual void Cancel()
         {
@@ -761,12 +859,16 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <remarks>
         /// This method is thread-safe and ensures proper cleanup of resources:
         /// - Cancels any running processing operation
-        /// - Waits for operation completion with a timeout (500ms)
+        /// - Waits for operation completion with a timeout (<see cref="DefaultDisposeOperationWaitTimeout"/>)
         /// - Disposes all managed resources (Mats, CancellationTokenSource)
         ///
         /// Multiple calls to Dispose are allowed but only the first call will release the resources.
-        /// If a running operation doesn't complete within the timeout period (typical processing takes less than 200ms),
+        /// If a running operation doesn't complete within the wait period (typical processing takes less than 200ms),
         /// it will be forcefully terminated.
+        /// <para>
+        /// <b>WebGL:</b> This method performs synchronous blocking waits, which can cause deadlocks or hangs on WebGL.
+        /// On WebGL, prefer <see cref="DisposeAsync"/>.
+        /// </para>
         /// </remarks>
         /// <exception cref="ObjectDisposedException">Thrown when trying to access a disposed instance.</exception>
         public void Dispose()
@@ -792,19 +894,59 @@ namespace OpenCVForUnity.UnityIntegration.Worker
 
             if (completionSource != null)
             {
-                try
+                if (!TryWaitForTaskUntilCompleteOrTimeout(completionSource.Task, DefaultDisposeOperationWaitTimeout))
                 {
-                    // Wait for execution completion (typical processing + cancellation margin = 500ms)
-                    if (!completionSource.Task.Wait(TimeSpan.FromMilliseconds(500)))
-                    {
-                        Debug.LogWarning($"[{GetType().Name}] Dispose timeout: Operation did not complete within 500ms. This may indicate a performance issue or deadlock.");
-                    }
+                    Debug.LogWarning($"[{GetType().Name}] Dispose timeout: Operation did not complete within {DefaultDisposeOperationWaitTimeout.TotalMilliseconds:0}ms. This may indicate a performance issue or deadlock.");
                 }
-                catch (AggregateException)
+                else if (completionSource.Task.IsFaulted)
                 {
-                    // Ignore cancellation or other exceptions
+                    _ = completionSource.Task.Exception;
                 }
             }
+
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Asynchronously releases resources: cancels a running operation, waits up to <see cref="DefaultDisposeOperationWaitTimeout"/> for it to complete,
+        /// then disposes internal buffers. Prefer over <see cref="Dispose()"/> when you can <see langword="await"/>
+        /// to avoid blocking a thread on the completion wait.
+        /// </summary>
+        public virtual async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+
+            TaskCompletionSource<bool> completionSource = null;
+            lock (_lockObject)
+            {
+                if (_isRunning)
+                {
+                    try
+                    {
+                        _cts?.Cancel();
+                        completionSource = _executionCompletion;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Ignore already disposed
+                    }
+                }
+            }
+
+            if (completionSource != null)
+            {
+                if (!await TryWaitForTaskUntilCompleteOrTimeoutAsync(completionSource.Task, DefaultDisposeOperationWaitTimeout))
+                {
+                    Debug.LogWarning($"[{GetType().Name}] DisposeAsync timeout: Operation did not complete within {DefaultDisposeOperationWaitTimeout.TotalMilliseconds:0}ms. This may indicate a performance issue or deadlock.");
+                }
+                else if (completionSource.Task.IsFaulted)
+                {
+                    _ = completionSource.Task.Exception;
+                }
+            }
+
+            if (_disposed) return;
 
             Dispose(true);
             GC.SuppressFinalize(this);
@@ -866,7 +1008,7 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// Subclasses implement the asynchronous processing.
         /// </summary>
         /// <remarks>
-        /// This method is called by ExecuteAsync with a snapshot of the inputs
+        /// This method is called by ExecuteTaskAsync with a snapshot of the inputs
         /// to ensure thread safety. The implementation should:
         /// - Respect the cancellation token by calling ThrowIfCancellationRequested periodically
         /// - Handle resources properly
@@ -877,7 +1019,20 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// <param name="inputs">Snapshot of the input Mats.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        protected abstract Task<Mat[]> RunCoreProcessingAsync(Mat[] inputs, CancellationToken cancellationToken);
+        protected abstract Task<Mat[]> RunCoreProcessingTaskAsync(Mat[] inputs, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Subclasses implement the asynchronous processing.
+        /// </summary>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="RunCoreProcessingTaskAsync(Mat[], CancellationToken)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task{TResult}"/>.
+        /// </remarks>
+        /// <param name="inputs">Snapshot of the input Mats.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        [Obsolete("Use RunCoreProcessingTaskAsync(). RunCoreProcessingAsync() will return Awaitable in a future version.")]
+        protected Task<Mat[]> RunCoreProcessingAsync(Mat[] inputs, CancellationToken cancellationToken) =>
+            RunCoreProcessingTaskAsync(inputs, cancellationToken);
 
         /// <summary>
         /// Waits for the current processing operation to complete with a timeout.
@@ -886,12 +1041,13 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// This method is thread-safe and can be safely called from any thread.
         /// If no processing operation is running, returns immediately.
         /// If the operation doesn't complete within the specified timeout, throws TimeoutException.
-        /// This method works for both synchronous (Execute) and asynchronous (ExecuteAsync) operations.
+        /// This method works for both synchronous (Execute) and asynchronous (ExecuteTaskAsync) operations.
         /// </remarks>
         /// <param name="timeout">The timeout duration. If null, waits indefinitely.</param>
         /// <returns>A task that completes when the processing operation completes or times out.</returns>
         /// <exception cref="TimeoutException">Thrown when the operation doesn't complete within the specified timeout.</exception>
-        public virtual async Task WaitForCompletionAsync(TimeSpan? timeout = null)
+        /// <exception cref="InvalidOperationException">Thrown if the worker is in an invalid internal state (execution without a completion source).</exception>
+        public virtual async Task WaitForCompletionTaskAsync(TimeSpan? timeout = null)
         {
             TaskCompletionSource<bool> completionSource;
             lock (_lockObject)
@@ -900,35 +1056,92 @@ namespace OpenCVForUnity.UnityIntegration.Worker
                     return;
 
                 completionSource = _executionCompletion;
-                if (completionSource == null)
-                {
-                    // For synchronous Execute, create a new completion source
-                    completionSource = new TaskCompletionSource<bool>();
-                    _executionCompletion = completionSource;
-                }
             }
 
-            try
+            if (completionSource == null)
             {
-                if (timeout.HasValue)
-                {
-                    var completedTask = await Task.WhenAny(completionSource.Task, Task.Delay(timeout.Value)).ConfigureAwait(false);
-                    if (completedTask != completionSource.Task)
-                    {
-                        throw new TimeoutException($"Processing operation did not complete within {timeout.Value.TotalMilliseconds}ms.");
-                    }
-                }
-                else
-                {
-                    await completionSource.Task.ConfigureAwait(false);
-                }
+                throw new InvalidOperationException("Processing is running but the completion source is not available. This is an internal error in ProcessingWorkerBase.");
             }
-            catch (Exception ex) when (ex is not TimeoutException)
+
+            if (!await TryWaitForTaskUntilCompleteOrTimeoutAsync(completionSource.Task, timeout))
             {
-                // Propagate other exceptions
-                throw;
+                throw new TimeoutException($"Processing operation did not complete within {timeout.Value.TotalMilliseconds}ms.");
             }
+
+            await completionSource.Task;
         }
+
+        /// <summary>
+        /// For synchronous APIs. Polls on each iteration while yielding via <see cref="Task.Yield"/>.
+        /// </summary>
+        /// <param name="timeout">When <see langword="null"/>, waits indefinitely.</param>
+        /// <returns><see langword="true"/> when the task completed; <see langword="false"/> on timeout.</returns>
+        private static bool TryWaitForTaskUntilCompleteOrTimeout(Task task, TimeSpan? timeout) =>
+            PollUntilTaskCompleteOrTimeout(task, timeout, () => Task.Yield().GetAwaiter().GetResult());
+
+        /// <summary>
+        /// For asynchronous APIs. Polls on each iteration with <see cref="Task.Yield"/> so the Unity player loop can advance (WebGL-safe).
+        /// </summary>
+        /// <param name="timeout">When <see langword="null"/>, waits indefinitely.</param>
+        /// <returns><see langword="true"/> when the task completed; <see langword="false"/> on timeout.</returns>
+        private static Task<bool> TryWaitForTaskUntilCompleteOrTimeoutAsync(Task task, TimeSpan? timeout) =>
+            PollUntilTaskCompleteOrTimeoutAsync(task, timeout);
+
+        /// <summary>
+        /// Polls until <paramref name="task"/> completes or <paramref name="timeout"/> elapses (synchronous yield).
+        /// </summary>
+        private static bool PollUntilTaskCompleteOrTimeout(Task task, TimeSpan? timeout, Action yieldStep)
+        {
+            double? deadline = GetWaitDeadline(timeout);
+
+            while (!task.IsCompleted)
+            {
+                if (IsWaitDeadlineExceeded(deadline))
+                    return false;
+
+                yieldStep();
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Polls until <paramref name="task"/> completes or <paramref name="timeout"/> elapses (asynchronous yield).
+        /// </summary>
+        private static async Task<bool> PollUntilTaskCompleteOrTimeoutAsync(Task task, TimeSpan? timeout)
+        {
+            double? deadline = GetWaitDeadline(timeout);
+
+            while (!task.IsCompleted)
+            {
+                if (IsWaitDeadlineExceeded(deadline))
+                    return false;
+
+                await Task.Yield();
+            }
+
+            return true;
+        }
+
+        private static double? GetWaitDeadline(TimeSpan? timeout) =>
+            timeout.HasValue ? Time.realtimeSinceStartupAsDouble + timeout.Value.TotalSeconds : null;
+
+        private static bool IsWaitDeadlineExceeded(double? deadline) =>
+            deadline.HasValue && Time.realtimeSinceStartupAsDouble >= deadline.Value;
+
+        /// <summary>
+        /// Waits for the current processing operation to complete with a timeout.
+        /// </summary>
+        /// <remarks>
+        /// <c>@deprecated</c> Use <see cref="WaitForCompletionTaskAsync(TimeSpan?)"/>. In a future version, this member will return Unity <c>Awaitable</c> instead of <see cref="Task"/>.
+        /// </remarks>
+        /// <param name="timeout">The timeout duration. If null, waits indefinitely.</param>
+        /// <returns>A task that completes when the processing operation completes or times out.</returns>
+        /// <exception cref="TimeoutException">Thrown when the operation doesn't complete within the specified timeout.</exception>
+        /// <exception cref="InvalidOperationException">Thrown if the worker is in an invalid internal state (execution without a completion source).</exception>
+        [Obsolete("Use WaitForCompletionTaskAsync(). WaitForCompletionAsync() will return Awaitable in a future version.")]
+        public virtual Task WaitForCompletionAsync(TimeSpan? timeout = null) =>
+            WaitForCompletionTaskAsync(timeout);
 
         /// <summary>
         /// Waits for the current processing operation to complete with a timeout.
@@ -937,10 +1150,15 @@ namespace OpenCVForUnity.UnityIntegration.Worker
         /// This method is thread-safe and can be safely called from any thread.
         /// If no processing operation is running, returns immediately.
         /// If the operation doesn't complete within the specified timeout, throws TimeoutException.
-        /// This method works for both synchronous (Execute) and asynchronous (ExecuteAsync) operations.
+        /// This method works for both synchronous (Execute) and asynchronous (ExecuteTaskAsync) operations.
+        /// <para>
+        /// <b>WebGL:</b> This method performs synchronous blocking waits, which can cause deadlocks or hangs on WebGL.
+        /// On WebGL, prefer <see cref="WaitForCompletionTaskAsync(TimeSpan?)"/>.
+        /// </para>
         /// </remarks>
         /// <param name="timeout">The timeout duration. If null, waits indefinitely.</param>
         /// <exception cref="TimeoutException">Thrown when the operation doesn't complete within the specified timeout.</exception>
+        /// <exception cref="InvalidOperationException">Thrown if the worker is in an invalid internal state (execution without a completion source).</exception>
         public virtual void WaitForCompletion(TimeSpan? timeout = null)
         {
             TaskCompletionSource<bool> completionSource;
@@ -950,44 +1168,37 @@ namespace OpenCVForUnity.UnityIntegration.Worker
                     return;
 
                 completionSource = _executionCompletion;
-                if (completionSource == null)
-                {
-                    // For synchronous Execute, create a new completion source
-                    completionSource = new TaskCompletionSource<bool>();
-                    _executionCompletion = completionSource;
-                }
             }
 
-            try
+            if (completionSource == null)
             {
-                if (timeout.HasValue)
-                {
-                    if (!completionSource.Task.Wait(timeout.Value))
-                    {
-                        throw new TimeoutException($"Processing operation did not complete within {timeout.Value.TotalMilliseconds}ms.");
-                    }
-                }
-                else
-                {
-                    completionSource.Task.Wait();
-                }
+                throw new InvalidOperationException("Processing is running but the completion source is not available. This is an internal error in ProcessingWorkerBase.");
             }
-            catch (AggregateException ex)
+
+            if (!TryWaitForTaskUntilCompleteOrTimeout(completionSource.Task, timeout))
             {
-                // Unwrap the inner exception
-                throw ex.InnerException ?? ex;
+                throw new TimeoutException($"Processing operation did not complete within {timeout.Value.TotalMilliseconds}ms.");
             }
+
+            completionSource.Task.GetAwaiter().GetResult();
         }
 
         /// <summary>
         /// Raises the ProcessingCompleted event.
         /// </summary>
         /// <param name="isSuccess">Whether the operation completed successfully.</param>
-        /// <param name="error">The exception that occurred, if any.</param>
+        /// <param name="error">The exception that occurred when <paramref name="isSuccess"/> is <see langword="false"/>.</param>
         protected virtual void OnProcessingCompleted(bool isSuccess, Exception error = null)
         {
-            var completion = isSuccess ? ProcessingCompletion.Success() : ProcessingCompletion.Failure(error);
-            ProcessingCompleted?.Invoke(this, completion);
+            ProcessingCompletion completion;
+            if (isSuccess)
+                completion = ProcessingCompletion.ForSucceeded();
+            else if (error is OperationCanceledException)
+                completion = ProcessingCompletion.ForCanceled(error);
+            else
+                completion = ProcessingCompletion.ForFaulted(error);
+
+            ProcessingCompleted?.Invoke(completion);
         }
     }
 }

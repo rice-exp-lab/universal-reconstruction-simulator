@@ -3,6 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+#if OPENCV_SENTIS_AVAILABLE
+using Unity.InferenceEngine;
+#endif
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -34,17 +37,27 @@ namespace OpenCVForUnity.Editor
             //FacialExpressionRecognitionExample
             new Dictionary<string, string>() { { "module", "dnn" }, { "name", "FacialExpressionRecognitionExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/f872270fbb034ac326ee5a8d6343299bde765bc4/models/face_detection_yunet/face_detection_yunet_2023mar.onnx" }, { "filename", "face_detection_yunet_2023mar.onnx" }, { "sha", "acbe4b5976ade60c4b866a30d0720d71589c8bbc" } },
             new Dictionary<string, string>() { { "module", "dnn" }, { "name", "FacialExpressionRecognitionExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/c3a51f7049977ae29fb4b4781645fc79925b7dde/models/facial_expression_recognition/facial_expression_recognition_mobilefacenet_2022july.onnx" } , { "filename", "facial_expression_recognition_mobilefacenet_2022july.onnx" }, { "sha", "c2ded863504333117c57fddf6941e8c860134183" } },
-            //PoseEstimationMediaPipeExample
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "PoseEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/0d619617a8e9a389150d8c76e417451a19468150/models/person_detection_mediapipe/person_detection_mediapipe_2023mar.onnx" } , { "filename", "person_detection_mediapipe_2023mar.onnx" }, { "sha", "c99fdade615dbda34c4b51462947e21b2797864f" } },
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "PoseEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/0d619617a8e9a389150d8c76e417451a19468150/models/pose_estimation_mediapipe/pose_estimation_mediapipe_2023mar.onnx" } , { "filename", "pose_estimation_mediapipe_2023mar.onnx" }, { "sha", "9ecbfab8dec975ba02d8436a65cd69755238be20" } },
-            //HandPoseEstimationMediaPipeExample
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "HandPoseEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/6c68bc48c6f96042b29b3425174e431ccac38376/models/palm_detection_mediapipe/palm_detection_mediapipe_2023feb.onnx" } , { "filename", "palm_detection_mediapipe_2023feb.onnx" }, { "sha", "b9e6df1d4f93ee1b0b4f5c99a2f88716ccd7ca9a" } },
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "HandPoseEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/05a07912a619f3dd491ba22ca489245c7847c9ff/models/handpose_estimation_mediapipe/handpose_estimation_mediapipe_2023feb.onnx" } , { "filename", "handpose_estimation_mediapipe_2023feb.onnx" }, { "sha", "48cfa3de98f30986ae2be6ed55e80d46e06713ab" } },
-            //HumanPoseStreamEstimationMediaPipeExample
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "HumanPoseStreamEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/0d619617a8e9a389150d8c76e417451a19468150/models/person_detection_mediapipe/person_detection_mediapipe_2023mar.onnx" } , { "filename", "person_detection_mediapipe_2023mar.onnx" }, { "sha", "c99fdade615dbda34c4b51462947e21b2797864f" } },
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "HumanPoseStreamEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/0d619617a8e9a389150d8c76e417451a19468150/models/pose_estimation_mediapipe/pose_estimation_mediapipe_2023mar.onnx" } , { "filename", "pose_estimation_mediapipe_2023mar.onnx" }, { "sha", "9ecbfab8dec975ba02d8436a65cd69755238be20" } },
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "HumanPoseStreamEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/6c68bc48c6f96042b29b3425174e431ccac38376/models/palm_detection_mediapipe/palm_detection_mediapipe_2023feb.onnx" } , { "filename", "palm_detection_mediapipe_2023feb.onnx" }, { "sha", "b9e6df1d4f93ee1b0b4f5c99a2f88716ccd7ca9a" } },
-            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "HumanPoseStreamEstimationMediaPipeExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/05a07912a619f3dd491ba22ca489245c7847c9ff/models/handpose_estimation_mediapipe/handpose_estimation_mediapipe_2023feb.onnx" } , { "filename", "handpose_estimation_mediapipe_2023feb.onnx" }, { "sha", "48cfa3de98f30986ae2be6ed55e80d46e06713ab" } },
+            // MediaPipeFaceLandmarkerExample
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeFaceLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeFaceLandmarkerExample/face_blendshapes.onnx" }, { "filename", "mediapipe/face_blendshapes.onnx" }, { "sha", "a19668d737ad89f82860a43f181fe27df0157d2c" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeFaceLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeFaceLandmarkerExample/face_detector.onnx" }, { "filename", "mediapipe/face_detector.onnx" }, { "sha", "1a9ba8518b386bca0ed7d7d01525007450bcb85d" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeFaceLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeFaceLandmarkerExample/face_landmarks_detector.onnx" }, { "filename", "mediapipe/face_landmarks_detector.onnx" }, { "sha", "998178f88055c8bc3787a3c90f8585a5d1788868" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeFaceLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeFaceLandmarkerExample/geometry_pipeline_metadata_including_iris_landmarks.pbtxt" }, { "filename", "mediapipe/geometry_pipeline_metadata_including_iris_landmarks.pbtxt" }, { "sha", "44c97c332c029123ab42677dfcd490cad72423b4" } },
+            // MediaPipeHandLandmarkerExample
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHandLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHandLandmarkerExample/hand_detector.onnx" }, { "filename", "mediapipe/hand_detector.onnx" }, { "sha", "10b9deacee65ee41ef9548e37eb88821ef75b7fa" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHandLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHandLandmarkerExample/hand_landmarks_detector.onnx" }, { "filename", "mediapipe/hand_landmarks_detector.onnx" }, { "sha", "c32bcdeaac9e44325a972b302fb153340b11e460" } },
+            // MediaPipeHolisticLandmarkerExample
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHolisticLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHolisticLandmarkerExample/face_blendshapes.onnx" }, { "filename", "mediapipe/face_blendshapes.onnx" }, { "sha", "a19668d737ad89f82860a43f181fe27df0157d2c" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHolisticLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHolisticLandmarkerExample/face_detector.onnx" }, { "filename", "mediapipe/face_detector.onnx" }, { "sha", "1a9ba8518b386bca0ed7d7d01525007450bcb85d" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHolisticLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHolisticLandmarkerExample/face_landmarks_detector.onnx" }, { "filename", "mediapipe/face_landmarks_detector.onnx" }, { "sha", "998178f88055c8bc3787a3c90f8585a5d1788868" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHolisticLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHolisticLandmarkerExample/hand_landmarks_detector.onnx" }, { "filename", "mediapipe/hand_landmarks_detector.onnx" }, { "sha", "c32bcdeaac9e44325a972b302fb153340b11e460" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHolisticLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHolisticLandmarkerExample/hand_roi_refinement.onnx" }, { "filename", "mediapipe/hand_roi_refinement.onnx" }, { "sha", "d6a3d4498de5fbcbecb99452f0683f7350710459" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHolisticLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHolisticLandmarkerExample/lite_pose_landmarks_detector.onnx" }, { "filename", "mediapipe/lite_pose_landmarks_detector.onnx" }, { "sha", "f6af07df2ab9f9759f0a712c0408e0dd3d585c7b" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipeHolisticLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipeHolisticLandmarkerExample/pose_detector.onnx" }, { "filename", "mediapipe/pose_detector.onnx" }, { "sha", "c99fdade615dbda34c4b51462947e21b2797864f" } },
+            // MediaPipePoseLandmarkerExample
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipePoseLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipePoseLandmarkerExample/full_pose_landmarks_detector.onnx" }, { "filename", "mediapipe/full_pose_landmarks_detector.onnx" }, { "sha", "238d24ee63c0d97ba5fdc6395f8f2dc962e99c54" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipePoseLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipePoseLandmarkerExample/heavy_pose_landmarks_detector.onnx" }, { "filename", "mediapipe/heavy_pose_landmarks_detector.onnx" }, { "sha", "d56ade08a79734645b516dc379f5a099e95695fe" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipePoseLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipePoseLandmarkerExample/lite_pose_landmarks_detector.onnx" }, { "filename", "mediapipe/lite_pose_landmarks_detector.onnx" }, { "sha", "f6af07df2ab9f9759f0a712c0408e0dd3d585c7b" } },
+            new Dictionary<string, string>() { { "module", "dnn" }, { "name", "MediaPipePoseLandmarkerExample" }, { "url", "https://raw.githubusercontent.com/EnoxSoftware/OpenCVForUnityExampleAssets/f4f791d5f330cdef388369f78120457f23f8998d/dnn/MediaPipePoseLandmarkerExample/pose_detector.onnx" }, { "filename", "mediapipe/pose_detector.onnx" }, { "sha", "c99fdade615dbda34c4b51462947e21b2797864f" } },
             //HumanSegmentationPPHumanSegExample
             new Dictionary<string, string>() { { "module", "dnn" }, { "name", "HumanSegmentationPPHumanSegExample" }, { "url", "https://github.com/opencv/opencv_zoo/raw/2027dd2f5a8a5746b5d4964900a0465afc6d3a53/models/human_segmentation_pphumanseg/human_segmentation_pphumanseg_2023mar.onnx" } , { "filename", "human_segmentation_pphumanseg_2023mar.onnx" }, { "sha", "f0fec695ab7b716eeab4c58b125e98fc3826bb72" } },
             //ImageClassificationMobilenetExample
@@ -212,10 +225,61 @@ namespace OpenCVForUnity.Editor
             }
 
             string currentScriptPath = AssetDatabase.GUIDToAssetPath(guids[0]);
-            string opencvForUnityFolderPath = currentScriptPath.Substring(0, currentScriptPath.LastIndexOf("/Editor/EditorWindow"));
-            string streamingAssetsFolderPath = opencvForUnityFolderPath + "/StreamingAssets/OpenCVForUnityExamples";
+            // Unity asset paths often use '/'; normalize for marker search.
+            string normalizedScriptPath = currentScriptPath.Replace('\\', '/');
+            const string editorMarker = "/Editor/EditorWindow";
+            int markerIndex = normalizedScriptPath.LastIndexOf(editorMarker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+            {
+                Debug.LogWarning("OpenCVForUnityExampleAssetsDownloaderWindow: Could not resolve OpenCVForUnity root from script path.");
+                return null;
+            }
 
-            return streamingAssetsFolderPath;
+            string opencvForUnityFolderPath = normalizedScriptPath.Substring(0, markerIndex);
+            return CombinePathNormalizeSlash(opencvForUnityFolderPath, "StreamingAssets", "OpenCVForUnityExamples");
+        }
+
+        /// <summary>
+        /// Destination path under StreamingAssets; separators are normalized to '/' (Unity-style).
+        /// <c>filename</c> may include subfolders (e.g. mediapipe/file.onnx).
+        /// </summary>
+        private static string GetExampleAssetDestinationPath(string streamingAssetsRoot, Dictionary<string, string> file)
+        {
+            if (string.IsNullOrEmpty(streamingAssetsRoot) || file == null)
+                return null;
+
+            string[] relativeSegments = file["filename"].Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+            var segments = new List<string> { streamingAssetsRoot.TrimEnd('/', '\\'), file["module"] };
+            segments.AddRange(relativeSegments);
+            return CombinePathNormalizeSlash(segments.ToArray());
+        }
+
+        /// <summary>
+        /// Joins path segments with <see cref="Path.Combine"/>, then normalizes separators to '/'.
+        /// </summary>
+        private static string CombinePathNormalizeSlash(params string[] paths)
+        {
+            if (paths == null || paths.Length == 0)
+                return null;
+
+            string path = paths[0].Replace('/', Path.DirectorySeparatorChar);
+            for (int i = 1; i < paths.Length; i++)
+            {
+                if (!string.IsNullOrEmpty(paths[i]))
+                    path = Path.Combine(path, paths[i]);
+            }
+
+            return path.Replace('\\', '/');
+        }
+
+        /// <summary>
+        /// Ensures the parent directory exists before writing a file (needed when <c>filename</c> contains subfolders).
+        /// </summary>
+        private static void EnsureParentDirectoryExists(string filePath)
+        {
+            string directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
         }
 
         private string[] GetExampleNames(Dictionary<string, string>[] files)
@@ -304,7 +368,9 @@ namespace OpenCVForUnity.Editor
                     string fileInfo = $"{file["module"]}/{file["filename"]}";
                     _processingFileList.Add(fileInfo);
 
-                    string path = _streamingAssetsFolderPath + "/" + file["module"] + "/" + file["filename"];
+                    string path = GetExampleAssetDestinationPath(_streamingAssetsFolderPath, file);
+                    if (string.IsNullOrEmpty(path))
+                        continue;
 
                     // Skip if file exists and hash matches
                     if (File.Exists(path) && CheckSHA1Hash(file))
@@ -399,16 +465,59 @@ namespace OpenCVForUnity.Editor
 
         private void CancelDownloadFiles()
         {
-            _unityWebRequest.Abort();
+            _unityWebRequest?.Abort();
             IsDownloading = false;
+        }
+
+        /// <summary>
+        /// Waits for several editor update ticks after <see cref="Progress.Finish"/> so the progress overlay can repaint before a modal dialog blocks the UI.
+        /// </summary>
+        private void ScheduleDownloadCompletedDialogAfterProgressRepaint()
+        {
+            const int editorUpdatesBeforeDialog = 3;
+            int remaining = editorUpdatesBeforeDialog;
+            EditorApplication.CallbackFunction onEditorUpdate = null;
+            onEditorUpdate = () =>
+            {
+                remaining--;
+                if (remaining > 0)
+                    return;
+
+                EditorApplication.update -= onEditorUpdate;
+
+                if (_downloadSuccessFileCount == _downloadingFiles.Count)
+                {
+                    EditorUtility.DisplayDialog("Download Completed",
+                        $"All files have been successfully downloaded. Success: {_downloadSuccessFileCount}, Skipped: {_skippedFileCount}.", "OK");
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Download Completed",
+                        $"Success: {_downloadSuccessFileCount}, Failure: {_downloadFailureFileCount}, Skipped: {_skippedFileCount}\nFiles that failed to download are output to the console.", "OK");
+                }
+
+                Repaint();
+            };
+
+            EditorApplication.update += onEditorUpdate;
         }
 
         private void DownloadFile(Dictionary<string, string> file)
         {
             _unityWebRequest?.Dispose();
+            _unityWebRequest = null;
 
+            string path = GetExampleAssetDestinationPath(_streamingAssetsFolderPath, file);
+            if (string.IsNullOrEmpty(path))
+            {
+                Debug.LogError("Could not build download destination path: " + file["name"] + " / " + file["filename"]);
+                _downloadFailureFileCount++;
+                ContinueOrFinishDownloadFile();
+                return;
+            }
+
+            EnsureParentDirectoryExists(path);
             _unityWebRequest = new UnityWebRequest(file["url"], UnityWebRequest.kHttpVerbGET);
-            string path = _streamingAssetsFolderPath + "/" + file["module"] + "/" + file["filename"];
             _unityWebRequest.downloadHandler = new DownloadHandlerFile(path);
             _unityWebRequest.EditorSendWebRequest(
                 //onSuccess
@@ -419,6 +528,9 @@ namespace OpenCVForUnity.Editor
                         Debug.Log("Download Success: " + path);
 
                         _downloadSuccessFileCount++;
+#if OPENCV_SENTIS_AVAILABLE
+                        ConvertOnnxToSentis(path);
+#endif
                     }
                     else
                     {
@@ -466,28 +578,12 @@ namespace OpenCVForUnity.Editor
 
                 AssetDatabase.Refresh();
 
-                // Set progress bar to 100% and finish it
+                // Set progress bar to 100% and finish it (repaint may lag until the next editor updates)
                 Progress.Report(_currentProgressID, 1.0f, "Download completed");
                 Progress.Finish(_currentProgressID, Progress.Status.Succeeded);
+                Repaint();
 
-                // Use EditorApplication.delayCall to ensure the progress bar is updated before showing the dialog
-                EditorApplication.delayCall += () =>
-                {
-                    // Add a small delay to ensure the progress bar is fully updated
-                    EditorApplication.delayCall += () =>
-                    {
-                        if (_downloadSuccessFileCount == _downloadingFiles.Count)
-                        {
-                            EditorUtility.DisplayDialog("Download Completed",
-                                $"All files have been successfully downloaded. Success: {_downloadSuccessFileCount}, Skipped: {_skippedFileCount}.", "OK");
-                        }
-                        else
-                        {
-                            EditorUtility.DisplayDialog("Download Completed",
-                                $"Success: {_downloadSuccessFileCount}, Failure: {_downloadFailureFileCount}, Skipped: {_skippedFileCount}\nFiles that failed to download are output to the console.", "OK");
-                        }
-                    };
-                };
+                ScheduleDownloadCompletedDialogAfterProgressRepaint();
             }
             else
             {
@@ -495,12 +591,74 @@ namespace OpenCVForUnity.Editor
             }
         }
 
+#if OPENCV_SENTIS_AVAILABLE
+        /// <summary>
+        /// After a successful ONNX download, writes a .sentis next to it (no confirmation dialog).
+        /// Loads via Unity-imported <see cref="ModelAsset"/> and <see cref="ModelLoader.Load(ModelAsset)"/>.
+        /// </summary>
+        private static void ConvertOnnxToSentis(string downloadedFileFullPath)
+        {
+            if (string.IsNullOrEmpty(downloadedFileFullPath)
+                || !downloadedFileFullPath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            string sentisPath = Path.ChangeExtension(downloadedFileFullPath, ".sentis").Replace('\\', '/');
+            try
+            {
+                // Refresh so the asset database sees the new ONNX before loading ModelAsset.
+                AssetDatabase.Refresh();
+
+                Model model = TryLoadModelFromOnnxAsset(downloadedFileFullPath);
+                if (model == null)
+                {
+                    Debug.LogWarning("ONNX to Sentis Failure (no ModelAsset): " + downloadedFileFullPath);
+                    return;
+                }
+
+                ModelWriter.Save(sentisPath, model);
+                AssetDatabase.Refresh();
+                Debug.Log("Sentis Conversion Success: " + sentisPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+            }
+        }
+
+        /// <summary>
+        /// Loads the downloaded ONNX as a <see cref="Model"/> via <see cref="ModelAsset"/>.
+        /// <paramref name="onnxPath"/> must already be <c>Assets/...</c> with '/' separators (from <see cref="GetExampleAssetDestinationPath"/>).
+        /// </summary>
+        /// <returns>The loaded <see cref="Model"/>, or null if the path is empty or <see cref="ModelAsset"/> is missing.</returns>
+        private static Model TryLoadModelFromOnnxAsset(string onnxPath)
+        {
+            if (string.IsNullOrEmpty(onnxPath))
+            {
+                return null;
+            }
+
+            AssetDatabase.ImportAsset(onnxPath, ImportAssetOptions.ForceUpdate);
+            ModelAsset modelAsset = AssetDatabase.LoadAssetAtPath<ModelAsset>(onnxPath);
+            if (modelAsset == null)
+            {
+                Debug.LogWarning("ModelAsset not found: " + onnxPath);
+                return null;
+            }
+
+            return ModelLoader.Load(modelAsset);
+        }
+#endif
+
         private bool CheckSHA1Hash(Dictionary<string, string> file)
         {
             //skip check
             if (!file.ContainsKey("sha")) return true;
 
-            string filePath = _streamingAssetsFolderPath + "/" + file["module"] + "/" + file["filename"];
+            string filePath = GetExampleAssetDestinationPath(_streamingAssetsFolderPath, file);
+            if (string.IsNullOrEmpty(filePath))
+                return false;
 
             // Return false if file doesn't exist
             if (!File.Exists(filePath)) return false;

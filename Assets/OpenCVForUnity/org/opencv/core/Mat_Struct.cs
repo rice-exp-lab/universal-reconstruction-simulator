@@ -1,9 +1,9 @@
-using OpenCVForUnity.UnityIntegration;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using OpenCVForUnity.UnityIntegration;
 using UnityEngine;
 
 namespace OpenCVForUnity.CoreModule

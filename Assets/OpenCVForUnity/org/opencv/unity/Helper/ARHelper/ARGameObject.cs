@@ -22,10 +22,13 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
     /// - Supports multiple solvePnP flags and optional refinement processes using solvePnPRefineLM or solvePnPRefineVVS.
     /// - Provides RANSAC filtering to remove outliers before solvePnP computation.
     /// - Supports coordinate system transformations and noise reduction via low-pass and smoothing filters.
+    /// - Optional outlier rejection (hold): if position/rotation jumps exceed thresholds vs. the last accepted pose, the new estimate is discarded and the previous pose is kept.
     /// - Configurable NDC (Normalized Device Coordinates) range settings for viewport detection.
     /// - Supports axis inversion transformations for AR matrix adjustments.
     /// - Triggers events when the object enters or exits the AR camera viewport with configurable delay frames.
     /// - Updates the object's transform based on computed AR matrices.
+    /// - OnEnterARCameraViewport and OnExitARCameraViewport fire from within <see cref="CalculateARMatrix"/> when the viewport inside/outside state changes, after the delay frame counts <see cref="DelayFrameOnEnterARCameraViewportEvent"/> and <see cref="DelayFrameOnExitARCameraViewportEvent"/>.
+    /// - For those events to fire reliably, update ImagePoints and ObjectPoints on every frame where new points are obtained, and call <see cref="CalculateARMatrix"/> continuously.
     /// </remarks>
     public class ARGameObject : MonoBehaviour
     {
@@ -72,23 +75,30 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             {
                 _imagePoints = value;
 
-                _changedSolvePnpPoints = true;
-                //Debug.Log("changedSolvePnpPoints " + changedSolvePnpPoints);
+                _changedSolvePnPParameters = true;
+                //Debug.Log("changedSolvePnPParameters " + changedSolvePnPParameters);
             }
         }
 
         [Header("3D Points")]
 
-        [SerializeField, Tooltip("Enable this flag if the object point is a left-hand coordinate system (Unity).")]
+        [SerializeField, Tooltip("Enable this flag if the object point is a left-hand coordinate system (Unity). When converting from a right-hand coordinate system to Unity coordinates (left-hand coordinate system), use the rule of inverting the Y coordinate.")]
         protected bool _leftHandedCoordinates = false;
 
         /// <summary>
         /// Enable this flag if the object point is a left-hand coordinate system (Unity).
+        /// When converting from a right-hand coordinate system to Unity coordinates (left-hand coordinate system), use the rule of inverting the Y coordinate.
         /// </summary>
         public virtual bool LeftHandedCoordinates
         {
             get => _leftHandedCoordinates;
-            set => _leftHandedCoordinates = value;
+            set
+            {
+                if (_leftHandedCoordinates == value)
+                    return;
+                _leftHandedCoordinates = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [SerializeField, Tooltip("Specify the objectPoints argument to the Calib3d.solvePnP() method.")]
@@ -104,8 +114,8 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             {
                 _objectPoints = value;
 
-                _changedSolvePnpPoints = true;
-                //Debug.Log("changedSolvePnpPoints " + changedSolvePnpPoints);
+                _changedSolvePnPParameters = true;
+                //Debug.Log("changedSolvePnPParameters " + changedSolvePnPParameters);
             }
         }
 
@@ -120,7 +130,13 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         public virtual Calib3dSolvePnPFlagsMode SolvePnPFlagsMode
         {
             get => _solvePnPFlagsMode;
-            set => _solvePnPFlagsMode = value;
+            set
+            {
+                if (_solvePnPFlagsMode == value)
+                    return;
+                _solvePnPFlagsMode = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [Space(10)]
@@ -134,7 +150,13 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         public virtual bool UseSOLVEPNP_ITERATIVE
         {
             get => _useSOLVEPNP_ITERATIVE;
-            set => _useSOLVEPNP_ITERATIVE = value;
+            set
+            {
+                if (_useSOLVEPNP_ITERATIVE == value)
+                    return;
+                _useSOLVEPNP_ITERATIVE = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [Space(10)]
@@ -148,7 +170,13 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         public virtual bool UseSolvePnPRansac
         {
             get => _useSolvePnPRansac;
-            set => _useSolvePnPRansac = value;
+            set
+            {
+                if (_useSolvePnPRansac == value)
+                    return;
+                _useSolvePnPRansac = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [SerializeField, Tooltip("Maximum number of iterations for RANSAC.")]
@@ -161,20 +189,32 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         public virtual int IterationsCount
         {
             get => _iterationsCount;
-            set => _iterationsCount = value;
+            set
+            {
+                if (_iterationsCount == value)
+                    return;
+                _iterationsCount = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
-        [SerializeField, Tooltip("Maximum distance from a point to an epipolar line in pixels for RANSAC.")]
-        [Range(0.1f, 10.0f)]
+        [SerializeField, Tooltip("Maximum reprojection error (pixels) used for inlier classification in solvePnPRansac. This is the distance between observed 2D points and 2D points projected from 3D points using the estimated pose.")]
+        [Range(0.1f, 128.0f)]
         protected float _reprojectionError = 8.0f;
 
         /// <summary>
-        /// Maximum distance from a point to an epipolar line in pixels for RANSAC.
+        /// Reprojection error threshold (pixels) passed to solvePnPRansac. This is not an epipolar distance.
         /// </summary>
         public virtual float ReprojectionError
         {
             get => _reprojectionError;
-            set => _reprojectionError = value;
+            set
+            {
+                if (_reprojectionError.Equals(value))
+                    return;
+                _reprojectionError = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [SerializeField, Tooltip("Confidence level for RANSAC.")]
@@ -187,7 +227,13 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         public virtual float Confidence
         {
             get => _confidence;
-            set => _confidence = value;
+            set
+            {
+                if (_confidence.Equals(value))
+                    return;
+                _confidence = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [Space(10)]
@@ -201,11 +247,17 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         public virtual SolvePnPRefinementMethod RefinementMethod
         {
             get => _solvePnPRefinementMethod;
-            set => _solvePnPRefinementMethod = value;
+            set
+            {
+                if (_solvePnPRefinementMethod == value)
+                    return;
+                _solvePnPRefinementMethod = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [SerializeField, Tooltip("If refinement is enabled, the refinement method is called if the reprojection error RMS is greater than the specified threshold.")]
-        [Range(0.0f, 10.0f)]
+        [Range(0.0f, 5000.0f)]
         protected float _solvePnPRefinementRMSThreshold = 1.0f;
 
         /// <summary>
@@ -214,7 +266,50 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         public virtual float SolvePnPRefinementRMSThreshold
         {
             get => _solvePnPRefinementRMSThreshold;
-            set => _solvePnPRefinementRMSThreshold = value;
+            set
+            {
+                if (_solvePnPRefinementRMSThreshold.Equals(value))
+                    return;
+                _solvePnPRefinementRMSThreshold = value;
+                _changedSolvePnPParameters = true;
+            }
+        }
+
+        [SerializeField, Tooltip("When enabled, frames whose reprojection error RMS exceeds the rejection threshold are treated the same as being outside the viewport.")]
+        protected bool _rejectPoseByReprojectionRms = false;
+
+        /// <summary>
+        /// Applies the RMS-based rejection gate when enabled.
+        /// </summary>
+        public virtual bool RejectPoseByReprojectionRms
+        {
+            get => _rejectPoseByReprojectionRms;
+            set
+            {
+                if (_rejectPoseByReprojectionRms == value)
+                    return;
+                _rejectPoseByReprojectionRms = value;
+                _changedSolvePnPParameters = true;
+            }
+        }
+
+        [SerializeField, Tooltip("If reprojection error RMS (post-refinement when refinement runs) exceeds this value, the pose is rejected and treated as outside the viewport. This is independent from the refinement start threshold.")]
+        [Range(0.0f, 5000.0f)]
+        protected float _rejectReprojectionRMSThreshold = 5.0f;
+
+        /// <summary>
+        /// RMS rejection threshold (pixels). Independent from the refinement threshold.
+        /// </summary>
+        public virtual float RejectReprojectionRMSThreshold
+        {
+            get => _rejectReprojectionRMSThreshold;
+            set
+            {
+                if (_rejectReprojectionRMSThreshold.Equals(value))
+                    return;
+                _rejectReprojectionRMSThreshold = value;
+                _changedSolvePnPParameters = true;
+            }
         }
 
         [Header("NDC Range Settings")]
@@ -264,6 +359,137 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             set => _ndcZRange = value;
         }
 
+#if UNITY_EDITOR
+        [SerializeField, Tooltip("When enabled, draws a wireframe of the NDC range volume in the Scene view (uses parent ARHelper → ARCamera projection matrix).")]
+        bool _ndcRangeDebugDrawInScene = true;
+
+        static readonly int[,] NdcDebugBoxEdges =
+        {
+            { 0, 1 }, { 0, 2 }, { 0, 4 }, { 1, 3 }, { 1, 5 }, { 2, 3 },
+            { 2, 6 }, { 3, 7 }, { 4, 5 }, { 4, 6 }, { 5, 7 }, { 6, 7 },
+        };
+
+        void OnDrawGizmos()
+        {
+            if (!_ndcRangeDebugDrawInScene)
+                return;
+            DrawNdcRangeVolumeGizmo();
+        }
+
+        /// <summary>
+        /// Inverse-projects the eight corners of the NDC axis-aligned box to camera space and draws edges in the Scene view.
+        /// </summary>
+        void DrawNdcRangeVolumeGizmo()
+        {
+            ARHelper helper = GetComponentInParent<ARHelper>(true);
+            if (helper == null || helper.ARCamera == null)
+                return;
+
+            ARCamera arCam = helper.ARCamera;
+            Camera cam = arCam.GetComponent<Camera>();
+            if (cam == null)
+                return;
+
+            Matrix4x4 P = arCam._opencvCameraProjectionMatrix;
+            if (P.m00 == 0f && P.m11 == 0f && P.m22 == 0f && P.m33 == 0f)
+                return;
+
+            Vector3[] worldCorners = new Vector3[8];
+            bool allOk = true;
+            for (int i = 0; i < 8; i++)
+            {
+                float nx = (i & 1) != 0 ? _ndcXRange.y : _ndcXRange.x;
+                float ny = (i & 2) != 0 ? _ndcYRange.y : _ndcYRange.x;
+                float nz = (i & 4) != 0 ? _ndcZRange.y : _ndcZRange.x;
+                if (!TryCameraSpaceFromNdcClipHomogeneous(P, nx, ny, nz, out Vector3 camSpace))
+                {
+                    allOk = false;
+                    break;
+                }
+
+                worldCorners[i] = cam.transform.TransformPoint(camSpace);
+            }
+
+            if (!allOk)
+                return;
+
+            Color prev = Handles.color;
+            Handles.color = new Color(0.2f, 0.85f, 0.35f, 0.95f);
+
+            for (int e = 0; e < NdcDebugBoxEdges.GetLength(0); e++)
+            {
+                int a = NdcDebugBoxEdges[e, 0];
+                int b = NdcDebugBoxEdges[e, 1];
+                Handles.DrawLine(worldCorners[a], worldCorners[b]);
+            }
+
+            // Vertices 0-3 are on the NDC Z = _ndcZRange.x plane; place the label at the center of that plane.
+            Vector3 labelPos = (worldCorners[0] + worldCorners[1] + worldCorners[2] + worldCorners[3]) * 0.25f;
+
+            Handles.Label(labelPos, "NDC Range (viewport check)");
+
+            Handles.color = prev;
+        }
+
+        /// <summary>
+        /// Maps NDC (nx, ny, nz) to camera space using the inverse projection matrix (clip homogeneous (nx,ny,nz,1)).
+        /// </summary>
+        static bool TryCameraSpaceFromNdcClipHomogeneous(Matrix4x4 P, float nx, float ny, float nz, out Vector3 cameraSpace)
+        {
+            cameraSpace = default;
+            Matrix4x4 invP = Matrix4x4.Inverse(P);
+            Vector4 h = invP * new Vector4(nx, ny, nz, 1f);
+            if (Mathf.Abs(h.w) < 1e-7f || float.IsNaN(h.w) || float.IsInfinity(h.w))
+                return false;
+            cameraSpace = new Vector3(h.x / h.w, h.y / h.w, h.z / h.w);
+            if (float.IsNaN(cameraSpace.x) || float.IsNaN(cameraSpace.y) || float.IsNaN(cameraSpace.z))
+                return false;
+            if (float.IsInfinity(cameraSpace.x) || float.IsInfinity(cameraSpace.y) || float.IsInfinity(cameraSpace.z))
+                return false;
+            return true;
+        }
+#endif
+
+        [Header("OutlierRejectionFilter")]
+
+        [SerializeField, Tooltip("When enabled, estimates whose position/rotation delta from the previously accepted pose exceed thresholds are rejected, and display holds the previous pose.")]
+        protected bool _useOutlierRejectionFilter = false;
+
+        /// <summary>
+        /// Whether outlier rejection (pose hold) is enabled.
+        /// </summary>
+        public virtual bool UseOutlierRejectionFilter
+        {
+            get => _useOutlierRejectionFilter;
+            set => _useOutlierRejectionFilter = value;
+        }
+
+        [SerializeField, Tooltip("Outlier check setting. Rejects the current frame estimate if its position delta from the last accepted pose exceeds this value (meters).")]
+        [Min(0.0001f)]
+        protected float _outlierRejectionMaxPositionDeltaMeters = 0.35f;
+
+        /// <summary>
+        /// Position threshold for outlier rejection (meters).
+        /// </summary>
+        public virtual float OutlierRejectionMaxPositionDeltaMeters
+        {
+            get => _outlierRejectionMaxPositionDeltaMeters;
+            set => _outlierRejectionMaxPositionDeltaMeters = Mathf.Max(0.0001f, value);
+        }
+
+        [SerializeField, Tooltip("Outlier check setting. Rejects the current frame estimate if its rotation delta from the last accepted pose exceeds this value (degrees).")]
+        [Min(0.1f)]
+        protected float _outlierRejectionMaxRotationDeltaDegrees = 55f;
+
+        /// <summary>
+        /// Rotation threshold for outlier rejection (degrees).
+        /// </summary>
+        public virtual float OutlierRejectionMaxRotationDeltaDegrees
+        {
+            get => _outlierRejectionMaxRotationDeltaDegrees;
+            set => _outlierRejectionMaxRotationDeltaDegrees = Mathf.Max(0.1f, value);
+        }
+
         [Header("LowPassFilter")]
 
         [SerializeField, Tooltip("When enabled, LowPassFilter suppresses noise.")]
@@ -292,7 +518,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         }
 
         [SerializeField, Tooltip("Rotation parameter of LowPassFilter (Value in degrees)")]
-        [Range(0.0f, 15.0f)]
+        [Range(0.0f, 45.0f)]
         protected float _rotationLowPassParam = 4f;
 
         /// <summary>
@@ -342,6 +568,26 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         {
             get => _rotationSmoothingFactor;
             set => _rotationSmoothingFactor = Mathf.Clamp01(value);
+        }
+
+        [Header("ARMatrix")]
+
+        [SerializeField, Tooltip("When ON, ARMatrix includes conversion from OpenCV right-handed coordinates to Unity left-handed coordinates during calculation. When OFF, no conversion is applied. This is independent from objectPoints Left Handed Coordinates.")]
+        protected bool _convertLeftHandedARMatrix = true;
+
+        /// <summary>
+        /// Whether the matrix returned by <see cref="GetARMatrix"/> includes conversion from OpenCV right-handed to Unity left-handed coordinates.
+        /// </summary>
+        public virtual bool ConvertLeftHandedARMatrix
+        {
+            get => _convertLeftHandedARMatrix;
+            set
+            {
+                if (_convertLeftHandedARMatrix == value)
+                    return;
+                _convertLeftHandedARMatrix = value;
+                RefreshTransformMatrixFromCachedPoseIfPossible();
+            }
         }
 
         [Header("Apply axis inversion to ARMatrix")]
@@ -504,9 +750,9 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         protected bool _isARGameObjectInARCameraViewport = false;
 
         /// <summary>
-        /// The flag that indicates whether the SolvePnP points have changed.
+        /// The flag that indicates whether SolvePnP parameters have changed.
         /// </summary>
-        protected bool _changedSolvePnpPoints = false;
+        protected bool _changedSolvePnPParameters = false;
 
         /// <summary>
         /// The flag that indicates whether the ARMatrix has changed.
@@ -536,23 +782,6 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         }
 
         /// <summary>
-        /// Called when the script is loaded or a value is changed in the Inspector.
-        /// </summary>
-        protected virtual void OnValidate()
-        {
-            //Debug.Log("OnValidate");
-
-#if UNITY_EDITOR
-            if (EditorApplication.isPlaying)
-            {
-#endif
-                _changedSolvePnpPoints = true;
-#if UNITY_EDITOR
-            }
-#endif
-        }
-
-        /// <summary>
         /// Initializes resources and sets the initial values.
         /// This method is called when Awake() is called.
         /// </summary>
@@ -571,7 +800,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             _isARGameObjectInARCameraViewport = false;
             _arCameraEventCount = -1;
 
-            _changedSolvePnpPoints = false;
+            _changedSolvePnPParameters = false;
             _changedARMatrix = false;
         }
 
@@ -588,6 +817,29 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         }
 
         /// <summary>
+        /// Applies axis inversions to <see cref="_transformMatrix"/>, updates <see cref="_arMatrix"/>, and sets the update flag for <see cref="UpdateTransform"/>.
+        /// </summary>
+        private void PublishARMatrixFromCurrentTransformMatrix()
+        {
+            _arMatrix = _transformMatrix;
+            if (_applyXaxisInversionToARMatrix) _arMatrix = _arMatrix * _invertXMatrix;
+            if (_applyYaxisInversionToARMatrix) _arMatrix = _arMatrix * _invertYMatrix;
+            if (_applyZaxisInversionToARMatrix) _arMatrix = _arMatrix * _invertZMatrix;
+            _changedARMatrix = true;
+        }
+
+        /// <summary>
+        /// Rebuilds <see cref="_transformMatrix"/> and <see cref="_arMatrix"/> from filtered <see cref="_oldPoseData"/> without running solvePnP (for example, when changing handedness flags in the inspector).
+        /// </summary>
+        private void RefreshTransformMatrixFromCachedPoseIfPossible()
+        {
+            if (!_isOldPoseDataInitialized)
+                return;
+            _transformMatrix = OpenCVARUtils.ConvertPoseDataToMatrix(ref _oldPoseData, _convertLeftHandedARMatrix);
+            PublishARMatrixFromCurrentTransformMatrix();
+        }
+
+        /// <summary>
         /// Calculate ARMatrix from set parameters.
         /// This method updates the ARMatrix that is used by the UpdateTransform() method.
         /// This method should be called before UpdateTransform().
@@ -596,77 +848,23 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         {
             //Debug.Log("CalculateARMatrix");
 
-            if (!isValidArgs())
+            if (!_changedSolvePnPParameters) return;
+            _changedSolvePnPParameters = false;
+
+            if (!IsValidArgsForCalculateARMatrix())
             {
-                checkARCameraEvent(false);
+                if (_enableDebugOutput)
+                {
+                    int ip = _imagePoints != null ? _imagePoints.Length : -1;
+                    int op = _objectPoints != null ? _objectPoints.Length : -1;
+                    Debug.LogWarning($"[ARGameObject] CalculateARMatrix skipped: invalid arguments (imagePoints={ip}, objectPoints={op}, solvePnPFlagsMode={_solvePnPFlagsMode})");
+                }
+
+                CheckARCameraEvent(false, arHelper);
                 _isARGameObjectInARCameraViewport = false;
 
                 return;
             }
-
-
-            // Validates if the input arguments are valid for AR matrix calculation.
-            bool isValidArgs()
-            {
-                // validate input arguments
-                if (_imagePoints == null || _imagePoints.Length == 0)
-                    return false;
-                if (_objectPoints == null || _objectPoints.Length == 0)
-                    return false;
-
-                if (!IsValidPointCountForSolvePnPFlag(_objectPoints.Length, _imagePoints.Length, _solvePnPFlagsMode))
-                    return false;
-
-                return true;
-            }
-
-            // Manages events when the AR object enters or exits the AR camera viewport. The event trigger is delayed to prevent unnecessary consecutive event invocations.
-            void checkARCameraEvent(bool isInViewport)
-            {
-                // If an event is already waiting to be triggered and the state changes, cancel the pending event.
-                if (_arCameraEventCount >= 0 && _isARGameObjectInARCameraViewport != isInViewport)
-                {
-                    _arCameraEventCount = -1; // Cancel the pending event.
-                    return;
-                }
-
-                // If no event is currently waiting and the state has changed, set up a new waiting period.
-                if (_arCameraEventCount < 0 && _isARGameObjectInARCameraViewport != isInViewport)
-                {
-                    // If entering the viewport, wait for `delayFrameOnEnterARCameraViewportEvent` frames before triggering the event.
-                    // If exiting the viewport, wait for `delayFrameOnExitARCameraViewportEvent` frames before triggering the event.
-                    _arCameraEventCount = isInViewport
-                        ? _delayFrameOnEnterARCameraViewportEvent
-                        : _delayFrameOnExitARCameraViewportEvent;
-                }
-
-                // If an event is waiting to be triggered, count down the frames.
-                if (_arCameraEventCount >= 0)
-                {
-                    if (_arCameraEventCount == 0) // When the countdown reaches zero, trigger the event.
-                    {
-                        if (isInViewport)
-                        {
-                            // Event triggered when the AR object enters the AR camera viewport.
-                            _onEnterARCameraViewport.Invoke(arHelper, arHelper.ARCamera, this);
-                        }
-                        else
-                        {
-                            // Event triggered when the AR object exits the AR camera viewport.
-                            _onExitARCameraViewport.Invoke(arHelper, arHelper.ARCamera, this);
-                        }
-                        _arCameraEventCount = -1; // Disable the counter after triggering the event.
-                    }
-                    else
-                    {
-                        _arCameraEventCount--; // Decrease the countdown counter.
-                    }
-                }
-            }
-
-
-            if (!_changedSolvePnpPoints) return;
-            _changedSolvePnpPoints = false;
             //Debug.Log("CalculateARMatrix 2");
 
             // tvec and rvec are null, initialize resources.
@@ -681,6 +879,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             Vector2[] imagePoints = _imagePoints;
             Vector3[] objectPoints;
             // If the object point is a left-hand coordinate system (Unity), convert it to a right-hand coordinate system (OpenCV).
+            // Coordinate conversion rule: invert the Y coordinate value.
             if (_leftHandedCoordinates)
             {
                 objectPoints = new Vector3[_objectPoints.Length];
@@ -692,17 +891,19 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                 objectPoints = _objectPoints;
             }
 
-            bool newIsARGameObjectInARCameraViewport;
+            // Whether the current-frame pose is considered valid (inside NDC range and not RMS-rejected).
+            bool isInARCameraViewport;
 
             Mat camMatrix = arHelper.ARCamera.GetCamMatrix();
             MatOfDouble distCoeffs = arHelper.ARCamera.GetDistCoeffs();
 
-            SolvePnPWithRansacAndRefinement(imagePoints, objectPoints, camMatrix, distCoeffs, _rvec, _tvec, _isARGameObjectInARCameraViewport);
+            bool rejectedByReprojectionRms = SolvePnPWithRansacAndRefinement(imagePoints, objectPoints, camMatrix, distCoeffs, _rvec, _tvec, _isARGameObjectInARCameraViewport);
 
-            newIsARGameObjectInARCameraViewport = IsARGameObjectInARCameraViewport(_tvec, arHelper.ARCamera._opencvCameraProjectionMatrix);
-            //Debug.Log("newIsARGameObjectInARCameraViewport " + newIsARGameObjectInARCameraViewport);
+            bool ndcInViewport = IsARGameObjectInARCameraViewport(_tvec, arHelper.ARCamera._opencvCameraProjectionMatrix);
+            isInARCameraViewport = ndcInViewport && !rejectedByReprojectionRms;
+            //Debug.Log("isInARCameraViewport " + isInARCameraViewport);
 
-            if (newIsARGameObjectInARCameraViewport)
+            if (isInARCameraViewport)
             {
                 // Convert to unity pose data.
                 PoseData poseData = OpenCVARUtils.ConvertRvecTvecToPoseData(_rvec, _tvec);
@@ -711,52 +912,141 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                 //Debug.Log("poseData.rot " + poseData.rot);
 
                 // Initialize old pose data with first valid pose data
+                bool holdPreviousPoseDueToOutlier = false;
                 if (!_isOldPoseDataInitialized)
                 {
                     _oldPoseData = poseData;
                     _isOldPoseDataInitialized = true;
                     // Debug.Log("Initialized old pose data with first valid pose");
                 }
-
-                //Changes in pos / rot below these thresholds are ignored.
-                if (_useLowPassFilter)
+                else if (_useOutlierRejectionFilter && ShouldRejectPoseAsOutlier(poseData, _oldPoseData))
                 {
-                    OpenCVARUtils.LowpassPoseData(ref _oldPoseData, ref poseData, _positionLowPassParam, _rotationLowPassParam);
+                    holdPreviousPoseDueToOutlier = true;
+                    if (_enableDebugOutput)
+                    {
+                        float dPos = Vector3.Distance(poseData.Pos, _oldPoseData.Pos);
+                        float dRot = Quaternion.Angle(poseData.Rot, _oldPoseData.Rot);
+                        Debug.Log($"[ARGameObject] OutlierRejection: rejected and held previous pose dPos={dPos:F4}m (max={_outlierRejectionMaxPositionDeltaMeters}), dRot={dRot:F2}° (max={_outlierRejectionMaxRotationDeltaDegrees})");
+                    }
                 }
 
-                // Apply smoothing filter using exponential moving average
-                if (_useSmoothingFilter)
+                if (!holdPreviousPoseDueToOutlier)
                 {
-                    OpenCVARUtils.SmoothingFilterPoseData(ref _oldPoseData, ref poseData, _positionSmoothingFactor, _rotationSmoothingFactor);
+                    //Changes in pos / rot below these thresholds are ignored.
+                    if (_useLowPassFilter)
+                    {
+                        OpenCVARUtils.LowpassPoseData(ref _oldPoseData, ref poseData, _positionLowPassParam, _rotationLowPassParam);
+                    }
+
+                    // Apply smoothing filter using exponential moving average
+                    if (_useSmoothingFilter)
+                    {
+                        OpenCVARUtils.SmoothingFilterPoseData(ref _oldPoseData, ref poseData, _positionSmoothingFactor, _rotationSmoothingFactor);
+                    }
+
+                    // Update old pose data after filtering
+                    _oldPoseData = poseData;
                 }
 
-                // Update old pose data after filtering
-                _oldPoseData = poseData;
+                _transformMatrix = OpenCVARUtils.ConvertPoseDataToMatrix(ref _oldPoseData, _convertLeftHandedARMatrix);
 
-                _transformMatrix = OpenCVARUtils.ConvertPoseDataToMatrix(ref _oldPoseData, true);
+                if (_enableDebugOutput)
+                {
+                    Debug.Log($"[ARGameObject] Pose (after filtering) pos={_oldPoseData.Pos}, rot(euler)={_oldPoseData.Rot.eulerAngles}, LowPass={_useLowPassFilter}, Smoothing={_useSmoothingFilter}, OutlierHold={holdPreviousPoseDueToOutlier}");
+                }
+            }
+            else
+            {
+                // Outside the viewport, reset the previous pose used by the filter; on re-entry, initialize from the current pose (do not carry over the last in-viewport value).
+                _isOldPoseDataInitialized = false;
             }
 
-            _arMatrix = _transformMatrix;
-
-            if (_applyXaxisInversionToARMatrix) _arMatrix = _arMatrix * _invertXMatrix;
-            if (_applyYaxisInversionToARMatrix) _arMatrix = _arMatrix * _invertYMatrix;
-            if (_applyZaxisInversionToARMatrix) _arMatrix = _arMatrix * _invertZMatrix;
-
-            _changedARMatrix = true;
+            PublishARMatrixFromCurrentTransformMatrix();
             //Debug.Log("changedARMatrix " + changedARMatrix);
 
-            checkARCameraEvent(newIsARGameObjectInARCameraViewport);
-            _isARGameObjectInARCameraViewport = newIsARGameObjectInARCameraViewport;
+            CheckARCameraEvent(isInARCameraViewport, arHelper);
+            _isARGameObjectInARCameraViewport = isInARCameraViewport;
 
-            if (_enableDebugOutput)
+            string viewportDetail = $"InsideNDCRange={ndcInViewport}, RMSRejected={rejectedByReprojectionRms} (RMSRejectionGate={_rejectPoseByReprojectionRms}, RMSRejectionThreshold={_rejectReprojectionRMSThreshold})";
+            if (isInARCameraViewport)
             {
-                if (_isARGameObjectInARCameraViewport)
+                if (_enableDebugOutput)
+                    Debug.Log($"[ARGameObject] Viewport: valid=true, {viewportDetail}");
+            }
+            else
+            {
+                if (_enableDebugOutput)
+                    Debug.LogWarning($"[ARGameObject] Viewport: valid=false (invalid), {viewportDetail}");
+            }
+        }
+
+        /// <summary>
+        /// For outlier rejection (pose hold). Returns true if the current frame estimate should be rejected compared to the previously accepted pose.
+        /// </summary>
+        protected virtual bool ShouldRejectPoseAsOutlier(PoseData candidate, PoseData lastAccepted)
+        {
+            if (Vector3.Distance(candidate.Pos, lastAccepted.Pos) > _outlierRejectionMaxPositionDeltaMeters)
+                return true;
+            if (Quaternion.Angle(candidate.Rot, lastAccepted.Rot) > _outlierRejectionMaxRotationDeltaDegrees)
+                return true;
+            return false;
+        }
+
+        // Validates if the input arguments are valid for AR matrix calculation.
+        protected virtual bool IsValidArgsForCalculateARMatrix()
+        {
+            // validate input arguments
+            if (_imagePoints == null || _imagePoints.Length == 0)
+                return false;
+            if (_objectPoints == null || _objectPoints.Length == 0)
+                return false;
+
+            if (!IsValidPointCountForSolvePnPFlag(_objectPoints.Length, _imagePoints.Length, _solvePnPFlagsMode))
+                return false;
+
+            return true;
+        }
+
+        // Manages events when the AR object enters or exits the AR camera viewport. The event trigger is delayed to prevent unnecessary consecutive event invocations.
+        protected virtual void CheckARCameraEvent(bool isInViewport, ARHelper arHelper)
+        {
+            // If an event is already waiting to be triggered and the state changes, cancel the pending event.
+            if (_arCameraEventCount >= 0 && _isARGameObjectInARCameraViewport != isInViewport)
+            {
+                _arCameraEventCount = -1; // Cancel the pending event.
+                return;
+            }
+
+            // If no event is currently waiting and the state has changed, set up a new waiting period.
+            if (_arCameraEventCount < 0 && _isARGameObjectInARCameraViewport != isInViewport)
+            {
+                // If entering the viewport, wait for `delayFrameOnEnterARCameraViewportEvent` frames before triggering the event.
+                // If exiting the viewport, wait for `delayFrameOnExitARCameraViewportEvent` frames before triggering the event.
+                _arCameraEventCount = isInViewport
+                    ? _delayFrameOnEnterARCameraViewportEvent
+                    : _delayFrameOnExitARCameraViewportEvent;
+            }
+
+            // If an event is waiting to be triggered, count down the frames.
+            if (_arCameraEventCount >= 0)
+            {
+                if (_arCameraEventCount == 0) // When the countdown reaches zero, trigger the event.
                 {
-                    Debug.Log("ARGameObject is in ARCameraViewport");
+                    if (isInViewport)
+                    {
+                        // Event triggered when the AR object enters the AR camera viewport.
+                        _onEnterARCameraViewport.Invoke(arHelper, arHelper.ARCamera, this);
+                    }
+                    else
+                    {
+                        // Event triggered when the AR object exits the AR camera viewport.
+                        _onExitARCameraViewport.Invoke(arHelper, arHelper.ARCamera, this);
+                    }
+                    _arCameraEventCount = -1; // Disable the counter after triggering the event.
                 }
                 else
                 {
-                    Debug.Log("ARGameObject is not in ARCameraViewport");
+                    _arCameraEventCount--; // Decrease the countdown counter.
                 }
             }
         }
@@ -839,7 +1129,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             _imagePoints = null;
             _objectPoints = null;
 
-            _changedSolvePnpPoints = true;
+            _changedSolvePnPParameters = true;
         }
 
 
@@ -855,17 +1145,17 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             if (objectPointCount != imagePointCount)
             {
                 if (_enableDebugOutput)
-                    Debug.LogWarning($"SolvePnP input is invalid: objectPoints ({objectPointCount}) and imagePoints ({imagePointCount}) count mismatch.");
+                    Debug.LogWarning($"[ARGameObject] SolvePnP input is invalid: objectPoints ({objectPointCount}) and imagePoints ({imagePointCount}) count mismatch.");
                 return false;
             }
 
             switch (solvePnPFlagsMode)
             {
                 case Calib3dSolvePnPFlagsMode.SOLVEPNP_ITERATIVE:
-                    if (objectPointCount < 4)
+                    if (objectPointCount < 6)
                     {
                         if (_enableDebugOutput)
-                            Debug.LogWarning($"SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 6 points, but got {objectPointCount}.");
+                            Debug.LogWarning($"[ARGameObject] SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 6 points, but got {objectPointCount}.");
                         return false;
                     }
                     return true;
@@ -876,7 +1166,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                     if (objectPointCount < 4)
                     {
                         if (_enableDebugOutput)
-                            Debug.LogWarning($"SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 4 points, but got {objectPointCount}.");
+                            Debug.LogWarning($"[ARGameObject] SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 4 points, but got {objectPointCount}.");
                         return false;
                     }
                     return true;
@@ -886,7 +1176,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                     if (objectPointCount < 4)
                     {
                         if (_enableDebugOutput)
-                            Debug.LogWarning($"SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 4 points, but got {objectPointCount}.");
+                            Debug.LogWarning($"[ARGameObject] SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 4 points, but got {objectPointCount}.");
                         return false;
                     }
                     return true;
@@ -895,7 +1185,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                     if (objectPointCount < 4)
                     {
                         if (_enableDebugOutput)
-                            Debug.LogWarning($"SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 4 points, but got {objectPointCount}.");
+                            Debug.LogWarning($"[ARGameObject] SolvePnP input is invalid: {solvePnPFlagsMode} requires at least 4 points, but got {objectPointCount}.");
                         return false;
                     }
                     return true;
@@ -905,14 +1195,14 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                     if (objectPointCount != 4)
                     {
                         if (_enableDebugOutput)
-                            Debug.LogWarning($"SolvePnP input is invalid: {solvePnPFlagsMode} requires exactly 4 points, but got {objectPointCount}.");
+                            Debug.LogWarning($"[ARGameObject] SolvePnP input is invalid: {solvePnPFlagsMode} requires exactly 4 points, but got {objectPointCount}.");
                         return false;
                     }
                     return true;
 
                 default:
                     if (_enableDebugOutput)
-                        Debug.LogWarning($"SolvePnP input is invalid: Unknown solvePnPFlagsMode ({solvePnPFlagsMode}).");
+                        Debug.LogWarning($"[ARGameObject] SolvePnP input is invalid: Unknown solvePnPFlagsMode ({solvePnPFlagsMode}).");
                     return false;
             }
         }
@@ -929,7 +1219,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             if (objectPointCount != imagePointCount)
             {
                 if (_enableDebugOutput)
-                    Debug.LogWarning($"Refinement input is invalid: objectPoints ({objectPointCount}) and imagePoints ({imagePointCount}) count mismatch.");
+                    Debug.LogWarning($"[ARGameObject] Refinement input is invalid: objectPoints ({objectPointCount}) and imagePoints ({imagePointCount}) count mismatch.");
                 return false;
             }
 
@@ -939,7 +1229,7 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                     if (objectPointCount < 4)
                     {
                         if (_enableDebugOutput)
-                            Debug.LogWarning($"Refinement input is invalid: {refinementMethod} requires at least 4 points, but got {objectPointCount}.");
+                            Debug.LogWarning($"[ARGameObject] Refinement input is invalid: {refinementMethod} requires at least 4 points, but got {objectPointCount}.");
                         return false;
                     }
                     return true;
@@ -948,14 +1238,14 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                     if (objectPointCount < 4)
                     {
                         if (_enableDebugOutput)
-                            Debug.LogWarning($"Refinement input is invalid: {refinementMethod} requires at least 4 points, but got {objectPointCount}.");
+                            Debug.LogWarning($"[ARGameObject] Refinement input is invalid: {refinementMethod} requires at least 4 points, but got {objectPointCount}.");
                         return false;
                     }
                     return true;
 
                 default:
                     if (_enableDebugOutput)
-                        Debug.LogWarning($"Refinement input is invalid: Unknown refinement method ({refinementMethod}).");
+                        Debug.LogWarning($"[ARGameObject] Refinement input is invalid: Unknown refinement method ({refinementMethod}).");
                     return false;
             }
         }
@@ -971,7 +1261,8 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
         /// <param name="rvec">Output rotation vector</param>
         /// <param name="tvec">Output translation vector</param>
         /// <param name="isARGameObjectInARCameraViewport">Whether the AR game object is in the AR camera viewport</param>
-        private void SolvePnPWithRansacAndRefinement(Vector2[] imagePoints, Vector3[] objectPoints, Mat camMatrix, MatOfDouble distCoeffs, Mat rvec, Mat tvec, bool isARGameObjectInARCameraViewport)
+        /// <returns>Returns true when <see cref="_rejectPoseByReprojectionRms"/> is enabled and final reprojection RMS exceeds <see cref="_rejectReprojectionRMSThreshold"/> (used to treat the pose as outside the viewport).</returns>
+        private bool SolvePnPWithRansacAndRefinement(Vector2[] imagePoints, Vector3[] objectPoints, Mat camMatrix, MatOfDouble distCoeffs, Mat rvec, Mat tvec, bool isARGameObjectInARCameraViewport)
         {
             MatOfPoint2f markerCorners2d = new MatOfPoint2f(imagePoints);
             MatOfPoint3f markerCorners3d = new MatOfPoint3f(objectPoints);
@@ -987,6 +1278,11 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
                 solvePnPFlags = Calib3d.SOLVEPNP_ITERATIVE;
             }
 
+            if (_enableDebugOutput)
+            {
+                Debug.Log($"[ARGameObject] solvePnP input: correspondenceCount={imagePoints.Length}, firstDetection={isFirstDetection}, extrinsicGuess={useExtrinsicGuess}, flagsMode={_solvePnPFlagsMode}, effectiveFlags=0x{solvePnPFlags:x}, RANSAC={_useSolvePnPRansac}, refinement={_solvePnPRefinementMethod}");
+            }
+
             // Try solvePnPRansac first if enabled
             bool ransacSuccess = false;
             MatOfInt inliers = null;
@@ -999,11 +1295,12 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
 
             // Use solvePnP with filtered points if RANSAC succeeded, otherwise use all points
             int inlierCount = inliers != null ? (int)inliers.total() : 0;
-            if (ransacSuccess && IsValidPointCountForSolvePnPFlag(inlierCount, inlierCount, (Calib3dSolvePnPFlagsMode)solvePnPFlags))
+            bool useInlierSubset = ransacSuccess && IsValidPointCountForSolvePnPFlag(inlierCount, inlierCount, (Calib3dSolvePnPFlagsMode)solvePnPFlags);
+            if (useInlierSubset)
             {
                 // Use inliers for solvePnP
                 if (_enableDebugOutput)
-                    Debug.Log("RANSAC succeeded with " + inlierCount + " inliers");
+                    Debug.Log($"[ARGameObject] RANSAC: success, running solvePnP with inliers={inlierCount}/{imagePoints.Length}");
 
                 MatOfPoint3f filteredObjectPoints = null;
                 MatOfPoint2f filteredImagePoints = null;
@@ -1046,6 +1343,14 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             }
             else
             {
+                if (_enableDebugOutput && _useSolvePnPRansac)
+                {
+                    if (!ransacSuccess)
+                        Debug.Log($"[ARGameObject] RANSAC: failed -> running solvePnP with all {imagePoints.Length} points");
+                    else
+                        Debug.Log($"[ARGameObject] RANSAC: succeeded but inliers={inlierCount} are insufficient for current solvePnP flags -> running solvePnP with all {imagePoints.Length} points");
+                }
+
                 // Use all points for solvePnP
                 Calib3d.solvePnP(markerCorners3d, markerCorners2d, camMatrix, distCoeffs,
                         rvec, tvec, useExtrinsicGuess, solvePnPFlags);
@@ -1054,32 +1359,40 @@ namespace OpenCVForUnity.UnityIntegration.Helper.AR
             if (inliers != null)
                 inliers.Dispose();
 
-            // Apply solvePnP refinement based on detection status
+            float finalReprojectionRms = CalculateReprojectionErrorRMS(markerCorners3d, markerCorners2d, rvec, tvec, camMatrix, distCoeffs);
+
+            bool refinementApplied = false;
             if (_solvePnPRefinementMethod != SolvePnPRefinementMethod.None)
             {
-                // Calculate reprojection error RMS for all detections (including first detection)
-                float reprojectionErrorRMS = CalculateReprojectionErrorRMS(markerCorners3d, markerCorners2d, rvec, tvec, camMatrix, distCoeffs);
                 if (_enableDebugOutput)
-                    Debug.Log("reprojectionErrorRMS before refinement " + reprojectionErrorRMS);
+                    Debug.Log($"[ARGameObject] Before refinement RMS={finalReprojectionRms}, refinementStartThreshold={_solvePnPRefinementRMSThreshold}");
 
-                // Determine if refinement should be performed based on RMS threshold and minimum point count
                 int pointCount = (int)markerCorners3d.total();
-                bool shouldRefine = reprojectionErrorRMS > _solvePnPRefinementRMSThreshold &&
+                bool shouldRefine = finalReprojectionRms > _solvePnPRefinementRMSThreshold &&
                                    IsValidPointCountForRefinementMethod(pointCount, pointCount, _solvePnPRefinementMethod);
 
                 if (shouldRefine)
                 {
                     ApplySolvePnPRefinement(markerCorners3d, markerCorners2d, camMatrix, distCoeffs, rvec, tvec);
+                    refinementApplied = true;
+                    finalReprojectionRms = CalculateReprojectionErrorRMS(markerCorners3d, markerCorners2d, rvec, tvec, camMatrix, distCoeffs);
                 }
+
+                if (_enableDebugOutput)
+                    Debug.Log($"[ARGameObject] Refinement: shouldRefine={shouldRefine}, applied={refinementApplied}, method={_solvePnPRefinementMethod}");
             }
 
+            bool rejectedByReprojectionRms = _rejectPoseByReprojectionRms && finalReprojectionRms > _rejectReprojectionRMSThreshold;
+
             if (_enableDebugOutput)
-                Debug.Log("reprojectionErrorRMS " + CalculateReprojectionErrorRMS(markerCorners3d, markerCorners2d, rvec, tvec, camMatrix, distCoeffs));
+                Debug.Log($"[ARGameObject] ReprojectionRMS(final)={finalReprojectionRms}, RMSRejected={rejectedByReprojectionRms} (gateEnabled={_rejectPoseByReprojectionRms}, rejectionThreshold={_rejectReprojectionRMSThreshold})");
 
             if (markerCorners2d != null)
                 markerCorners2d.Dispose();
             if (markerCorners3d != null)
                 markerCorners3d.Dispose();
+
+            return rejectedByReprojectionRms;
         }
 
         /// <summary>

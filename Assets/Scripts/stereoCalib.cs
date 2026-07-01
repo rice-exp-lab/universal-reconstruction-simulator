@@ -24,6 +24,10 @@ public class stereoCalib : MonoBehaviour
     private float markerLength;
     private int dictionaryId;
 
+    [Header("Board Pose Sequence")]
+    public BoardCalibrationPoseSequence boardPoseSequence;
+    public bool advanceBoardAfterSavedFrame = false;
+
     [Header("Image Resolution")]
     public int imgWidth = 1280;
     public int imgHeight = 720;
@@ -232,6 +236,9 @@ public class stereoCalib : MonoBehaviour
         allImagePoints2.Add(filteredCorners2);
 
         Debug.Log($"Frame {allObjectPoints.Count} saved: {commonIds.Count} common IDs");
+
+        if (advanceBoardAfterSavedFrame && boardPoseSequence != null)
+            boardPoseSequence.MoveToNextPose();
     }
 
     Mat FilterCornersByIds(Mat corners, Mat ids, List<int> commonIds)

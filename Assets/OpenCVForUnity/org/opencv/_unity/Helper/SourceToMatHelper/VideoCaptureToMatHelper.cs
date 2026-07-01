@@ -1,8 +1,8 @@
+using System;
+using System.Collections;
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.ImgprocModule;
 using OpenCVForUnity.VideoioModule;
-using System;
-using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Serialization;

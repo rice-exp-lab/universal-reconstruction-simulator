@@ -1,10 +1,10 @@
 #if !OPENCV_DONT_USE_WEBCAMTEXTURE_API
 
+using System;
+using System.Collections;
 using OpenCVForUnity.CoreModule;
 using OpenCVForUnity.ImgprocModule;
 using OpenCVForUnity.VideoioModule;
-using System;
-using System.Collections;
 using UnityEngine;
 
 namespace OpenCVForUnity.UnityUtils.Helper
